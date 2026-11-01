@@ -8,6 +8,8 @@ struct Assignment: Identifiable, Hashable {
     let points: Int
     let prompt: String
     let questions: [String]
+    let answerKey: [String]
+    let rubric: String
     let status: String
 
     static let samples: [Assignment] = [
@@ -19,6 +21,8 @@ struct Assignment: Identifiable, Hashable {
             points: 20,
             prompt: "Compare fractions, model equivalent values, and justify your answer.",
             questions: ["1. 3/4 ___ 2/3", "2. 5/8 + 1/4 = ___", "3. Explain how you know your answer is correct."],
+            answerKey: ["3/4 > 2/3", "7/8", "Use a common denominator, benchmark, or number line and explain the comparison."],
+            rubric: "Award partial credit for correct method and clear mathematical reasoning.",
             status: "Needs practice"
         ),
         Assignment(
@@ -29,6 +33,8 @@ struct Assignment: Identifiable, Hashable {
             points: 15,
             prompt: "Answer each question using details and evidence from the passage.",
             questions: ["1. Why was the character nervous?", "2. Which detail supports your answer?", "3. What lesson can we learn?", "4. Use a quote to support your thinking."],
+            answerKey: ["Answers vary; identify a reason grounded in the passage.", "A relevant detail from the passage.", "A reasonable lesson supported by events.", "A relevant quotation with an explanation."],
+            rubric: "Evaluate comprehension, use of text evidence, and clarity. Accept reasonable interpretations supported by evidence.",
             status: "In progress"
         ),
         Assignment(
@@ -39,6 +45,8 @@ struct Assignment: Identifiable, Hashable {
             points: 18,
             prompt: "Solve each equation and show the steps you used.",
             questions: ["1. x + 7 = 15", "2. 3y = 24", "3. Explain how you checked your answer."],
+            answerKey: ["x = 8", "y = 8", "Substitute the value back into the original equation."],
+            rubric: "Award partial credit for correct inverse operations and show-your-work reasoning.",
             status: "In progress"
         )
     ]

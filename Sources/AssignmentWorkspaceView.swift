@@ -4,10 +4,14 @@ import PencilKit
 
 struct AssignmentWorkspaceView: View {
     @EnvironmentObject private var documents: AssignmentDocumentStore
+    @EnvironmentObject private var profiles: StudentProfileStore
     @Environment(\.scenePhase) private var scenePhase
     let assignment: Assignment
 
     @State private var drawing = PKDrawing()
+    @State private var isGrading = false
+    @State private var grade: AssignmentGrade?
+    @State private var gradingError: String?
 
     var body: some View {
         ScrollView {
@@ -33,7 +37,9 @@ struct AssignmentWorkspaceView: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 20))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary, lineWidth: 1))
 
-                Label("Your writing is stored privately on this iPad. Agent grading can be connected after the review service is configured.", systemImage: "lock.shield")
+                gradingPanel
+
+                Label("AI grading is a suggestion. Review the result before using it to make learning decisions.", systemImage: "lock.shield")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
@@ -47,6 +53,9 @@ struct AssignmentWorkspaceView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             drawing = documents.drawing(for: assignment.id)
+            if let saved = UserDefaults.standard.data(forKey: gradeStorageKey) {
+                grade = try? JSONDecoder().decode(AssignmentGrade.self, from: saved)
+            }
         }
         .onChange(of: drawing) { _, newDrawing in
             documents.updateDrawing(newDrawing, for: assignment.id)
@@ -55,6 +64,84 @@ struct AssignmentWorkspaceView: View {
             if phase != .active {
                 documents.flushSave(for: assignment.id)
             }
+        }
+    }
+
+    private var gradeStorageKey: String { "assignment-grade-\(assignment.id)" }
+
+    private var gradingPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AI grader").font(.headline)
+                    Text("Checks the handwriting against this assignment's answer key and rubric.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    Task { await gradeAssignment() }
+                } label: {
+                    if isGrading {
+                        ProgressView().tint(.white)
+                    } else {
+                        Label(grade == nil ? "Grade work" : "Grade again", systemImage: "sparkles")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isGrading)
+            }
+            if let gradingError {
+                Text(gradingError).font(.subheadline).foregroundStyle(.red)
+            }
+            if let grade {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Suggested score").font(.headline)
+                        Spacer()
+                        Text("\(grade.score.formatted()) / \(grade.total.formatted())")
+                            .font(.title3.bold()).foregroundStyle(.indigo)
+                    }
+                    Text(grade.overallFeedback).font(.body)
+                    if grade.needsHumanReview {
+                        Label("Some handwriting needs a human review.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
+                    }
+                    ForEach(grade.items) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.question).font(.subheadline.weight(.semibold))
+                            Text("Read as: \(item.studentAnswer)").font(.subheadline)
+                            Text("Expected: \(item.expectedAnswer)").font(.subheadline).foregroundStyle(.secondary)
+                            Text(item.feedback).font(.caption).foregroundStyle(item.isCorrect ? .green : .orange)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding(14)
+                .background(.indigo.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .padding(18)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary))
+    }
+
+    @MainActor
+    private func gradeAssignment() async {
+        isGrading = true
+        gradingError = nil
+        defer { isGrading = false }
+        do {
+            let result = try await LearningAIService().grade(
+                assignment,
+                student: profiles.selectedStudent,
+                drawing: drawing
+            )
+            grade = result
+            UserDefaults.standard.set(try JSONEncoder().encode(result), forKey: gradeStorageKey)
+        } catch {
+            gradingError = error.localizedDescription
         }
     }
 
