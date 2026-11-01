@@ -31,13 +31,6 @@ struct LearningHubView: View {
             .tabItem { Label("Assignments", systemImage: "doc.text") }
 
             NavigationStack {
-                PlanTab(student: student)
-                    .navigationTitle("Learning plan")
-                    .toolbar { studentPicker }
-            }
-            .tabItem { Label("Plan", systemImage: "calendar") }
-
-            NavigationStack {
                 ProfileTab(student: student, onEdit: { editingProfile = student })
                     .navigationTitle("Profile")
                     .toolbar {
@@ -93,7 +86,10 @@ struct LearningHubView: View {
 private struct DashboardTab: View {
     let student: StudentProfile
     let editProfile: () -> Void
-    private var plan: StudentLearningPlan { .forStudent(student.id) }
+    private var plan: StudentLearningPlan { .forStudent(student.id, subject: student.subjects.first ?? "Mathematics") }
+    private var progress: [SubjectProgress] {
+        student.subjects.flatMap { StudentLearningPlan.forStudent(student.id, subject: $0).progress }.prefix(6).map { $0 }
+    }
 
     var body: some View {
         ScrollView {
@@ -129,7 +125,7 @@ private struct DashboardTab: View {
                     Spacer()
                     Text(plan.month).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                 }
-                ForEach(plan.progress) { item in ProgressRow(progress: item) }
+                ForEach(progress) { item in ProgressRow(progress: item) }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Next milestone", systemImage: "sparkles")
@@ -157,32 +153,30 @@ private struct SubjectsTab: View {
     @State private var subjectName = ""
     @State private var showingSubjectPrompt = false
     let student: StudentProfile
-    private var progress: [SubjectProgress] { StudentLearningPlan.forStudent(student.id).progress }
+    private var progress: [SubjectProgress] { student.subjects.flatMap { StudentLearningPlan.forStudent(student.id, subject: $0).progress } }
 
     var body: some View {
         List {
             Section {
                 ForEach(student.subjects, id: \.self) { subject in
-                    let item = progress.first(where: { $0.subject.localizedCaseInsensitiveContains(subject) || subject.localizedCaseInsensitiveContains($0.subject) })
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Label(subject, systemImage: icon(for: subject))
-                                .font(.headline)
-                            Spacer()
-                            Text(item?.status ?? "Active")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.indigo)
+                    let subjectPlan = StudentLearningPlan.forStudent(student.id, subject: subject)
+                    NavigationLink {
+                        SubjectPlanView(student: student, plan: subjectPlan)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Label(subject, systemImage: icon(for: subject)).font(.headline)
+                                Spacer()
+                                Text("\(subjectPlan.progress.first?.completion ?? 0)%")
+                                    .font(.caption.weight(.bold)).foregroundStyle(.indigo)
+                            }
+                            ProgressView(value: Double(subjectPlan.progress.map(\.completion).reduce(0, +)) / Double(max(subjectPlan.progress.count, 1)), total: 100)
+                                .tint(.indigo)
+                            Text(subjectPlan.focus)
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         }
-                        if let item {
-                            ProgressView(value: Double(item.completion), total: 100).tint(color(for: item.status))
-                            Text("\(item.completion)% · Next: \(item.nextMilestone)")
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else {
-                            Text("Learning progress will appear here.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
                 }
                 .onDelete { offsets in
                     var profile = student
@@ -192,7 +186,7 @@ private struct SubjectsTab: View {
             } header: {
                 Text("\(student.name)'s subjects")
             } footer: {
-                Text("Swipe left on a subject to remove it.")
+                Text("Tap a subject to open its learning plan. Swipe left to remove a subject.")
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -230,9 +224,46 @@ private struct SubjectsTab: View {
         if value.contains("science") || value.contains("biology") { return "atom" }
         return "text.book.closed"
     }
+}
 
-    private func color(for status: String) -> Color {
-        status == "On track" ? .green : status == "Needs support" ? .orange : .indigo
+private struct SubjectPlanView: View {
+    let student: StudentProfile
+    let plan: StudentLearningPlan
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("\(student.name.uppercased()) · \(student.gradeLevel.uppercased())")
+                        .font(.caption.weight(.bold)).tracking(0.8).foregroundStyle(.indigo)
+                    Text(plan.subject).font(.largeTitle.bold())
+                    Text(plan.focus).font(.body).foregroundStyle(.secondary)
+                    Label(plan.month, systemImage: "calendar")
+                        .font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            } header: { Text("Learning plan") }
+
+            Section("Skill progress") {
+                ForEach(plan.progress) { ProgressRow(progress: $0) }
+            }
+
+            Section("Milestones") {
+                ForEach(plan.milestones) { milestone in
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: milestone.kind == "Assessment" ? "checkmark.seal" : milestone.kind == "Assignment" ? "doc.text" : "calendar")
+                            .foregroundStyle(.indigo).frame(width: 28)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(milestone.title).font(.headline)
+                            Text("\(milestone.kind) · \(milestone.date)").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                }
+            }
+        }
+        .navigationTitle(plan.subject)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -276,40 +307,6 @@ private struct AssignmentListTab: View {
     }
 }
 
-private struct PlanTab: View {
-    let student: StudentProfile
-    private var plan: StudentLearningPlan { .forStudent(student.id) }
-
-    var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("MONTHLY FOCUS").font(.caption.weight(.bold)).tracking(1).foregroundStyle(.indigo)
-                    Text(plan.focus).font(.headline)
-                    Text(plan.month).font(.subheadline).foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 6)
-            }
-            Section("Timeline") {
-                ForEach(plan.milestones) { milestone in
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: milestone.kind == "Assessment" ? "checkmark.seal" : milestone.kind == "Assignment" ? "doc.text" : "calendar")
-                            .foregroundStyle(.indigo)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(milestone.title).font(.headline)
-                            Text("\(milestone.kind) · \(milestone.date)").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 5)
-                }
-            }
-            Section("Skill progress") {
-                ForEach(plan.progress) { ProgressRow(progress: $0) }
-            }
-        }
-    }
-}
 
 private struct ProfileTab: View {
     let student: StudentProfile
