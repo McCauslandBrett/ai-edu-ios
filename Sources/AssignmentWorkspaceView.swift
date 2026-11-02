@@ -219,7 +219,7 @@ private struct PencilCanvas: UIViewRepresentable {
         let canvas = PKCanvasView()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
-        canvas.drawingPolicy = .anyInput
+        canvas.drawingPolicy = .pencilOnly // Leave finger gestures available for scrolling the assignment page.
         canvas.tool = PKInkingTool(.pen, color: .systemBlue, width: 3)
         canvas.delegate = context.coordinator
         canvas.drawing = drawing

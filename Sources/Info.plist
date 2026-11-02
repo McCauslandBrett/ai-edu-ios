@@ -28,7 +28,7 @@
         <true/>
     </dict>
     <key>GRADING_API_BASE_URL</key>
-    <string>http://192.168.1.211:3001</string>
+    <string>http://192.168.1.211:3100</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UISupportedInterfaceOrientations</key>

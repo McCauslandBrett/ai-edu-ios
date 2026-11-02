@@ -132,8 +132,8 @@ struct LearningAIService {
 
     init() {
         let configured = Bundle.main.object(forInfoDictionaryKey: "GRADING_API_BASE_URL") as? String
-            ?? "http://192.168.1.211:3001"
-        baseURL = URL(string: configured) ?? URL(string: "http://192.168.1.211:3001")!
+            ?? "http://192.168.1.211:3100"
+        baseURL = URL(string: configured) ?? URL(string: "http://192.168.1.211:3100")!
     }
 
     func grade(_ assignment: Assignment, student: StudentProfile, drawing: PKDrawing) async throws -> AssignmentGrade {
@@ -176,11 +176,24 @@ struct LearningAIService {
         let endpoint = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 120
+        request.timeoutInterval = 300
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            switch error.code {
+            case .timedOut:
+                throw LearningAIServiceError.service("The grader did not finish within five minutes. Check the Learning AI Service Terminal window for an error, then try again.")
+            case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost, .notConnectedToInternet:
+                throw LearningAIServiceError.service("Can't reach the Learning AI Service at \(baseURL.host ?? "the configured address"):3100. Start it with start-learning-ai-service.command and keep that Terminal window open.")
+            default:
+                throw LearningAIServiceError.service(error.localizedDescription)
+            }
+        }
         guard let http = response as? HTTPURLResponse else {
             throw LearningAIServiceError.service("The AI service returned an invalid response.")
         }
