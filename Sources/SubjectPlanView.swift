@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SubjectPlanView: View {
     let student: StudentProfile
@@ -77,12 +78,25 @@ private struct SubjectWeekSection: View {
     let subject: String
     let week: GeneratedLearningPlan.Week
     let trackedSkills: [String]
+    @State private var didCopyPrompt = false
 
     var body: some View {
         Section("Week \(week.weekNumber) · \(week.theme)") {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Tutor lecture prompt", systemImage: "bubble.left.and.bubble.right")
-                    .font(.headline).foregroundStyle(.indigo)
+                HStack {
+                    Label("Tutor lecture prompt", systemImage: "bubble.left.and.bubble.right")
+                        .font(.headline).foregroundStyle(.indigo)
+                    Spacer()
+                    Button {
+                        UIPasteboard.general.string = week.lecturePrompt
+                        didCopyPrompt = true
+                    } label: {
+                        Label(didCopyPrompt ? "Copied" : "Copy prompt", systemImage: didCopyPrompt ? "checkmark" : "doc.on.doc")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(didCopyPrompt ? "Prompt copied" : "Copy tutor lecture prompt")
+                }
                 Text(week.lecturePrompt).font(.subheadline)
             }
             .padding(.vertical, 6)
