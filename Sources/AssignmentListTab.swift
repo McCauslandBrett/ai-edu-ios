@@ -3,6 +3,7 @@ import SwiftUI
 struct AssignmentListTab: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
+    private let gradeStore = AssignmentGradeStore()
 
     private var assignments: [Assignment] {
         profiles.assignments(for: student)
@@ -29,12 +30,28 @@ struct AssignmentListTab: View {
                                 Text("Due \(assignment.dueDate) · \(assignment.points) points").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(assignment.status).font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                            Text(status(for: assignment))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(statusColor(for: assignment))
                         }
                         .padding(.vertical, 6)
                     }
                 }
             }
         }
+    }
+
+    private func status(for assignment: Assignment) -> String {
+        guard let grade = gradeStore.load(assignmentID: assignment.id), assignment.isHomework else {
+            return assignment.status
+        }
+        return grade.isPassing ? "Passed" : "Failed"
+    }
+
+    private func statusColor(for assignment: Assignment) -> Color {
+        guard let grade = gradeStore.load(assignmentID: assignment.id), assignment.isHomework else {
+            return .orange
+        }
+        return grade.isPassing ? .green : .red
     }
 }

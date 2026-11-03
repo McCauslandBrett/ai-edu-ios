@@ -21,9 +21,9 @@ struct GeneratedLearningPlan: Codable {
     struct Progress: Codable, Identifiable {
         var id: String { subject }
         let subject: String
-        let completion: Double
-        let nextMilestone: String
-        let status: String
+        var completion: Double
+        var nextMilestone: String
+        var status: String
     }
 
     let subject: String
@@ -35,14 +35,26 @@ struct GeneratedLearningPlan: Codable {
         let subject: String
         let prompt: String
         let questions: [String]
+        var questionSkills: [String]? = nil
         let answerKey: [String]
         let rubric: String
         let points: Int
 
-        func makeAssignment(studentID: String, subject: String, weekNumber: Int, assessment: Bool = false) -> Assignment {
+        func makeAssignment(
+            studentID: String,
+            subject: String,
+            weekNumber: Int,
+            assessment: Bool = false,
+            trackedSkills: [String] = []
+        ) -> Assignment {
             let safeSubject = subject.lowercased().unicodeScalars.map {
                 CharacterSet.alphanumerics.contains($0) ? String($0) : "-"
             }.joined()
+            let linkedSkills = questionSkills?.count == questions.count
+                ? questionSkills!
+                : questions.indices.map { index in
+                    trackedSkills.isEmpty ? "Unassigned" : trackedSkills[index % trackedSkills.count]
+                }
             return Assignment(
                 id: ([studentID, safeSubject, String(weekNumber), id]).joined(separator: "-"),
                 subject: subject,
@@ -53,7 +65,9 @@ struct GeneratedLearningPlan: Codable {
                 questions: questions,
                 answerKey: answerKey,
                 rubric: rubric,
-                status: assessment ? "Assessment" : "Not started"
+                status: assessment ? "Assessment" : "Not started",
+                questionSkills: linkedSkills,
+                studentID: studentID
             )
         }
     }
@@ -68,7 +82,7 @@ struct GeneratedLearningPlan: Codable {
     }
 
     let milestones: [Milestone]
-    let progress: [Progress]
+    var progress: [Progress]
     let weeks: [Week]
 
     func validateFourWeekStructure() throws {

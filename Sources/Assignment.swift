@@ -11,6 +11,11 @@ struct Assignment: Identifiable, Codable, Hashable {
     let answerKey: [String]
     let rubric: String
     let status: String
+    var questionSkills: [String]? = nil
+    var studentID: String? = nil
+    var parentAssignmentID: String? = nil
+
+    var isHomework: Bool { status != "Assessment" }
 
     static let samples: [Assignment] = [
         Assignment(

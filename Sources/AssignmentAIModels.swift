@@ -22,6 +22,12 @@ struct AssignmentGrade: Codable, Equatable {
     let overallFeedback: String
     let needsHumanReview: Bool
     let items: [Item]
+
+    var correctCount: Int { items.filter(\.isCorrect).count }
+    var questionCount: Int { items.count }
+    var isPassing: Bool {
+        questionCount > 0 && Double(correctCount) / Double(questionCount) >= 0.8
+    }
 }
 
 struct AssignmentGenerationRequest: Encodable {
@@ -31,6 +37,7 @@ struct AssignmentGenerationRequest: Encodable {
     let objective: String
     let count: Int
     let pointsPerAssignment: Int
+    let targetedSkills: [String]
 }
 
 struct GeneratedAssignment: Codable, Identifiable {
@@ -39,22 +46,31 @@ struct GeneratedAssignment: Codable, Identifiable {
     let subject: String
     let prompt: String
     let questions: [String]
+    let questionSkills: [String]
     let answerKey: [String]
     let rubric: String
     let points: Int
 
-    func makeAssignment(dueDate: String = "Unscheduled") -> Assignment {
+    func makeAssignment(
+        dueDate: String = "Unscheduled",
+        studentID: String? = nil,
+        parentAssignmentID: String? = nil,
+        titlePrefix: String = ""
+    ) -> Assignment {
         Assignment(
             id: id,
             subject: subject,
-            title: title,
+            title: titlePrefix + title,
             dueDate: dueDate,
             points: points,
             prompt: prompt,
             questions: questions,
             answerKey: answerKey,
             rubric: rubric,
-            status: "Not started"
+            status: "Not started",
+            questionSkills: questionSkills,
+            studentID: studentID,
+            parentAssignmentID: parentAssignmentID
         )
     }
 }

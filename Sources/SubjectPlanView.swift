@@ -13,7 +13,12 @@ struct SubjectPlanView: View {
             if let saved {
                 TrackedSkillsSection(progress: saved.plan.progress)
                 ForEach(saved.plan.weeks) { week in
-                    SubjectWeekSection(student: student, subject: subject, week: week)
+                    SubjectWeekSection(
+                        student: student,
+                        subject: subject,
+                        week: week,
+                        trackedSkills: saved.plan.progress.map(\.subject)
+                    )
                 }
             } else {
                 PlanTemplateSection(fallback: fallback)
@@ -71,6 +76,7 @@ private struct SubjectWeekSection: View {
     let student: StudentProfile
     let subject: String
     let week: GeneratedLearningPlan.Week
+    let trackedSkills: [String]
 
     var body: some View {
         Section("Week \(week.weekNumber) · \(week.theme)") {
@@ -83,7 +89,11 @@ private struct SubjectWeekSection: View {
 
             NavigationLink {
                 AssignmentWorkspaceView(assignment: week.assessment.makeAssignment(
-                    studentID: student.id, subject: subject, weekNumber: week.weekNumber, assessment: true
+                    studentID: student.id,
+                    subject: subject,
+                    weekNumber: week.weekNumber,
+                    assessment: true,
+                    trackedSkills: trackedSkills
                 ))
             } label: {
                 Label(assessmentTitle, systemImage: "checkmark.seal").foregroundStyle(.orange)
@@ -92,7 +102,10 @@ private struct SubjectWeekSection: View {
             ForEach(week.assignments) { activity in
                 NavigationLink {
                     AssignmentWorkspaceView(assignment: activity.makeAssignment(
-                        studentID: student.id, subject: subject, weekNumber: week.weekNumber
+                        studentID: student.id,
+                        subject: subject,
+                        weekNumber: week.weekNumber,
+                        trackedSkills: trackedSkills
                     ))
                 } label: {
                     Label(activity.title, systemImage: "doc.text")

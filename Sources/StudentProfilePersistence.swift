@@ -25,16 +25,27 @@ struct StudentProfilePersistence {
         return saved
     }
 
+    func loadRetryAssignments() -> [Assignment] {
+        guard let data = defaults.data(forKey: Key.retryAssignments),
+              let saved = try? JSONDecoder().decode([Assignment].self, from: data) else {
+            return []
+        }
+        return saved
+    }
+
     func loadSelectedStudentID(fallback: String) -> String {
         defaults.string(forKey: Key.selectedStudentID) ?? fallback
     }
 
-    func save(students: [StudentProfile], subjectPlans: [String: StudentSubjectPlan]) {
+    func save(students: [StudentProfile], subjectPlans: [String: StudentSubjectPlan], retryAssignments: [Assignment]) {
         if let data = try? JSONEncoder().encode(students) {
             defaults.set(data, forKey: Key.students)
         }
         if let data = try? JSONEncoder().encode(subjectPlans) {
             defaults.set(data, forKey: Key.subjectPlans)
+        }
+        if let data = try? JSONEncoder().encode(retryAssignments) {
+            defaults.set(data, forKey: Key.retryAssignments)
         }
     }
 
@@ -45,6 +56,7 @@ struct StudentProfilePersistence {
     private enum Key {
         static let students = "studentProfiles"
         static let subjectPlans = "studentSubjectPlans"
+        static let retryAssignments = "retryAssignments"
         static let selectedStudentID = "selectedStudentID"
     }
 }

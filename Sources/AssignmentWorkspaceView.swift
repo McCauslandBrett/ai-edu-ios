@@ -10,8 +10,11 @@ struct AssignmentWorkspaceView: View {
 
     @State private var drawing = PKDrawing()
     @State private var isGrading = false
+    @State private var isGeneratingRetry = false
     @State private var grade: AssignmentGrade?
     @State private var gradingError: String?
+    @State private var retryError: String?
+    @State private var retryAssignment: Assignment?
     private let gradeStore = AssignmentGradeStore()
 
     var body: some View {
@@ -55,6 +58,7 @@ struct AssignmentWorkspaceView: View {
         .onAppear {
             drawing = documents.drawing(for: assignment.id)
             grade = gradeStore.load(assignmentID: assignment.id)
+            retryAssignment = profiles.retryAssignments.last { $0.parentAssignmentID == assignment.id }
         }
         .onChange(of: drawing) { _, newDrawing in
             documents.updateDrawing(newDrawing, for: assignment.id)
@@ -99,6 +103,38 @@ struct AssignmentWorkspaceView: View {
                             .font(.title3.bold()).foregroundStyle(.indigo)
                     }
                     Text(grade.overallFeedback).font(.body)
+                    if assignment.isHomework {
+                        HStack(spacing: 8) {
+                            Image(systemName: grade.isPassing ? "checkmark.seal.fill" : "xmark.seal.fill")
+                            Text(grade.isPassing ? "PASSED" : "NOT PASSED")
+                                .font(.headline.weight(.bold))
+                            Text("· (grade.correctCount)/(grade.questionCount) correct · 80% required")
+                                .font(.subheadline)
+                        }
+                        .foregroundStyle(grade.isPassing ? .green : .red)
+                        if !grade.isPassing {
+                            Button {
+                                Task { await generateRetryAttempt() }
+                            } label: {
+                                if isGeneratingRetry {
+                                    ProgressView("Creating a new attempt…")
+                                } else {
+                                    Label("Generate new attempt", systemImage: "arrow.clockwise")
+                                }
+                            }
+                            .disabled(isGeneratingRetry)
+                            if let retryError {
+                                Text(retryError).font(.subheadline).foregroundStyle(.red)
+                            }
+                            if let retryAssignment {
+                                NavigationLink {
+                                    AssignmentWorkspaceView(assignment: retryAssignment)
+                                } label: {
+                                    Label("Open new attempt", systemImage: "doc.text")
+                                }
+                            }
+                        }
+                    }
                     if grade.needsHumanReview {
                         Label("Some handwriting needs a human review.", systemImage: "exclamationmark.triangle.fill")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
@@ -137,8 +173,60 @@ struct AssignmentWorkspaceView: View {
             )
             grade = result
             gradeStore.save(result, assignmentID: assignment.id)
+            profiles.recordGrade(result, for: assignment, studentID: profiles.selectedStudent.id)
         } catch {
             gradingError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func generateRetryAttempt() async {
+        isGeneratingRetry = true
+        retryError = nil
+        defer { isGeneratingRetry = false }
+        guard let grade else { return }
+
+        var failedSkills: [String] = []
+        let mappedSkills = assignment.questionSkills ?? []
+        for (index, item) in grade.items.enumerated() where !item.isCorrect {
+            if mappedSkills.indices.contains(index) {
+                let skill = mappedSkills[index]
+                if !failedSkills.contains(skill) { failedSkills.append(skill) }
+            }
+        }
+        if failedSkills.isEmpty { failedSkills = [assignment.subject] }
+
+        let feedback = grade.items.filter { !$0.isCorrect }
+            .map { "Question: \($0.question). Feedback: \($0.feedback)" }
+            .joined(separator: "\n")
+        let request = AssignmentGenerationRequest(
+            student: AIStudentContext(
+                name: profiles.selectedStudent.name,
+                age: profiles.selectedStudent.age,
+                gradeLevel: profiles.selectedStudent.gradeLevel
+            ),
+            subject: assignment.subject,
+            topic: assignment.title,
+            objective: "Create a fresh new attempt. Focus on these skills: \(failedSkills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(assignment.prompt). Grading feedback to address: \(feedback)",
+            count: 1,
+            pointsPerAssignment: assignment.points,
+            targetedSkills: failedSkills
+        )
+
+        do {
+            guard let generated = try await AssignmentGenerationService().generate(request).first else {
+                throw LearningAIServiceError.service("The service did not return a new assignment attempt.")
+            }
+            let attempt = generated.makeAssignment(
+                dueDate: "New attempt",
+                studentID: profiles.selectedStudent.id,
+                parentAssignmentID: assignment.id,
+                titlePrefix: "Retry · "
+            )
+            profiles.addRetryAssignment(attempt)
+            retryAssignment = attempt
+        } catch {
+            retryError = error.localizedDescription
         }
     }
 

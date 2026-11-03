@@ -12,7 +12,8 @@ struct StudentSubjectPlan: Codable, Identifiable {
     let studentID: String
     let subject: String
     let inputs: SubjectPlanInputs
-    let plan: GeneratedLearningPlan
+    var plan: GeneratedLearningPlan
+    var competencyResults: [String: [Bool]]? = nil
 
     var id: String { Self.key(studentID: studentID, subject: subject) }
 
