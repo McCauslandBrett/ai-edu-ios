@@ -167,7 +167,8 @@ struct AssignmentWorkspaceView: View {
 
     private var questionWorkAreaHeight: CGFloat {
         let questionCount = CGFloat(max(assignment.questions.count, 1))
-        return max(160, min(240, 1_000 / questionCount))
+        let standardWritingArea = max(160, min(240, 1_000 / questionCount))
+        return standardWritingArea * 8
     }
 
     private var worksheetHeight: CGFloat {
