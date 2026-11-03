@@ -12,6 +12,7 @@ struct AssignmentWorkspaceView: View {
     @State private var isGrading = false
     @State private var grade: AssignmentGrade?
     @State private var gradingError: String?
+    private let gradeStore = AssignmentGradeStore()
 
     var body: some View {
         ScrollView {
@@ -53,9 +54,7 @@ struct AssignmentWorkspaceView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             drawing = documents.drawing(for: assignment.id)
-            if let saved = UserDefaults.standard.data(forKey: gradeStorageKey) {
-                grade = try? JSONDecoder().decode(AssignmentGrade.self, from: saved)
-            }
+            grade = gradeStore.load(assignmentID: assignment.id)
         }
         .onChange(of: drawing) { _, newDrawing in
             documents.updateDrawing(newDrawing, for: assignment.id)
@@ -66,8 +65,6 @@ struct AssignmentWorkspaceView: View {
             }
         }
     }
-
-    private var gradeStorageKey: String { "assignment-grade-\(assignment.id)" }
 
     private var gradingPanel: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -133,13 +130,13 @@ struct AssignmentWorkspaceView: View {
         gradingError = nil
         defer { isGrading = false }
         do {
-            let result = try await LearningAIService().grade(
+            let result = try await AssignmentGradingService().grade(
                 assignment,
                 student: profiles.selectedStudent,
                 drawing: drawing
             )
             grade = result
-            UserDefaults.standard.set(try JSONEncoder().encode(result), forKey: gradeStorageKey)
+            gradeStore.save(result, assignmentID: assignment.id)
         } catch {
             gradingError = error.localizedDescription
         }
@@ -204,69 +201,6 @@ struct AssignmentWorkspaceView: View {
             PencilCanvas(drawing: $drawing)
                 .background(Color.clear)
                 .padding(.top, 12)
-        }
-    }
-}
-
-private struct PencilCanvas: UIViewRepresentable {
-    @Binding var drawing: PKDrawing
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    func makeUIView(context: Context) -> PKCanvasView {
-        let canvas = PKCanvasView()
-        canvas.backgroundColor = .clear
-        canvas.isOpaque = false
-        canvas.drawingPolicy = .pencilOnly // Leave finger gestures available for scrolling the assignment page.
-        canvas.tool = PKInkingTool(.pen, color: .systemBlue, width: 3)
-        canvas.delegate = context.coordinator
-        canvas.drawing = drawing
-        canvas.alwaysBounceVertical = false
-        canvas.isScrollEnabled = false
-
-        if let window = canvas.window {
-            context.coordinator.attachToolPicker(to: canvas, window: window)
-        }
-        DispatchQueue.main.async {
-            if let window = canvas.window {
-                context.coordinator.attachToolPicker(to: canvas, window: window)
-            }
-        }
-        return canvas
-    }
-
-    func updateUIView(_ canvas: PKCanvasView, context: Context) {
-        context.coordinator.parent = self
-        if canvas.drawing != drawing {
-            canvas.drawing = drawing
-        }
-        if let window = canvas.window {
-            context.coordinator.attachToolPicker(to: canvas, window: window)
-        }
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, PKCanvasViewDelegate {
-        var parent: PencilCanvas
-        private var toolPicker: PKToolPicker?
-
-        init(_ parent: PencilCanvas) {
-            self.parent = parent
-        }
-
-        func attachToolPicker(to canvas: PKCanvasView, window: UIWindow) {
-            guard toolPicker == nil else { return }
-            let picker = PKToolPicker()
-            picker.setVisible(true, forFirstResponder: canvas)
-            picker.addObserver(canvas)
-            canvas.becomeFirstResponder()
-            toolPicker = picker
-        }
-
-        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            parent.drawing = canvasView.drawing
         }
     }
 }

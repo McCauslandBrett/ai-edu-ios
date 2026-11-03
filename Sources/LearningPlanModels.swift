@@ -1,0 +1,99 @@
+import Foundation
+
+struct LearningPlanGenerationRequest: Encodable {
+    let student: AIStudentContext
+    let subject: String
+    let objective: String
+    let monthlyWindow: String
+    let targetedSkills: [String]
+    let highestAssessmentLevel: String
+    let priorResults: [String]
+    let instructorContext: String
+}
+
+struct GeneratedLearningPlan: Codable {
+    struct Milestone: Codable, Identifiable {
+        let id: String
+        let title: String
+        let date: String
+        let kind: String
+    }
+    struct Progress: Codable, Identifiable {
+        var id: String { subject }
+        let subject: String
+        let completion: Double
+        let nextMilestone: String
+        let status: String
+    }
+
+    let subject: String
+    let objective: String
+    let monthlyWindow: String
+    struct PlannedActivity: Codable, Identifiable {
+        let id: String
+        let title: String
+        let subject: String
+        let prompt: String
+        let questions: [String]
+        let answerKey: [String]
+        let rubric: String
+        let points: Int
+
+        func makeAssignment(studentID: String, subject: String, weekNumber: Int, assessment: Bool = false) -> Assignment {
+            let safeSubject = subject.lowercased().unicodeScalars.map {
+                CharacterSet.alphanumerics.contains($0) ? String($0) : "-"
+            }.joined()
+            return Assignment(
+                id: ([studentID, safeSubject, String(weekNumber), id]).joined(separator: "-"),
+                subject: subject,
+                title: title,
+                dueDate: "Week \(weekNumber)",
+                points: points,
+                prompt: prompt,
+                questions: questions,
+                answerKey: answerKey,
+                rubric: rubric,
+                status: assessment ? "Assessment" : "Not started"
+            )
+        }
+    }
+
+    struct Week: Codable, Identifiable {
+        var id: Int { weekNumber }
+        let weekNumber: Int
+        let theme: String
+        let lecturePrompt: String
+        let assessment: PlannedActivity
+        let assignments: [PlannedActivity]
+    }
+
+    let milestones: [Milestone]
+    let progress: [Progress]
+    let weeks: [Week]
+
+    func validateFourWeekStructure() throws {
+        guard weeks.count == 4,
+              weeks.enumerated().allSatisfy({ $0.offset + 1 == $0.element.weekNumber && !$0.element.assignments.isEmpty }) else {
+            throw LearningAIServiceError.service("The generated plan must include four complete weeks, each with an assessment, lecture prompt, and assignment.")
+        }
+    }
+
+    var learningPlan: StudentLearningPlan {
+        StudentLearningPlan(
+            subject: subject,
+            focus: objective,
+            month: monthlyWindow,
+            milestones: milestones.map {
+                LearningMilestone(id: $0.id, title: $0.title, date: $0.date, kind: $0.kind)
+            },
+            progress: progress.map {
+                SubjectProgress(
+                    subject: $0.subject,
+                    completion: Int($0.completion.rounded()),
+                    nextMilestone: $0.nextMilestone,
+                    status: $0.status
+                )
+            }
+        )
+    }
+}

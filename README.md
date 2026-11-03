@@ -1,16 +1,18 @@
 # AI Edu iOS
 
-Native SwiftUI proof of concept for reviewing assignments and saving handwritten work on iPad.
+Native SwiftUI learning app for student profiles, subject plans, assignments, and handwritten work on iPad.
 
 ## Open the app
 
-Open `AIEdu.xcodeproj` in Xcode, select the `AIEdu` scheme, then choose an iPad simulator or connected iPad and press Run.
+Open `AIEdu.xcodeproj` in Xcode, select the `AIEdu` scheme, choose an iPad simulator or connected iPad, and press Run.
 
-## Current proof of concept
+## Architecture
 
-- Sample assignment list and assignment detail
-- Native PencilKit writing canvas, including Apple Pencil and finger input
-- Per-assignment drawing persistence in the app's Documents directory
-- Reopening an assignment restores its saved writing
+- `LearningHubView.swift` owns app navigation and student selection.
+- `DashboardTab.swift`, `SubjectsTab.swift`, `SubjectPlanView.swift`, `SubjectPlanCreationView.swift`, `AssignmentListTab.swift`, and `ProfileViews.swift` contain feature views.
+- `StudentProfile.swift`, `StudentLearningPlan.swift`, and `StudentSubjectPlan.swift` contain profile and plan models. `StudentLearningPlanTemplates.swift` contains preview data.
+- `StudentProfileStore.swift` manages profile/plan state; `StudentProfilePersistence.swift` owns UserDefaults persistence.
+- `Assignment.swift`, `AssignmentDocumentStore.swift`, and `AssignmentGradeStore.swift` own assignment data and local work/grade storage.
+- `AssignmentGradingService.swift`, `AssignmentGenerationService.swift`, and `LearningPlanGenerationService.swift` own their API operations. `LearningAIHTTPClient.swift` owns HTTP transport, and `HandwritingImageEncoder.swift` prepares PencilKit images for grading.
 
-Handwriting stays on the device. Agent grading and server synchronization are not wired up yet.
+The AI service lives in `/Users/brettmccausland/Documents/GitHub/ai-edu-service`. The Xcode project uses an explicit source file list, so new Swift files must be registered in `AIEdu.xcodeproj/project.pbxproj`.
