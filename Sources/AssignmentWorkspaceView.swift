@@ -30,7 +30,7 @@ struct AssignmentWorkspaceView: View {
                     }
 
                     worksheet
-                        .frame(minHeight: 620)
+                        .frame(minHeight: worksheetHeight)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(.gray.opacity(0.25), lineWidth: 1))
                 }
@@ -165,6 +165,15 @@ struct AssignmentWorkspaceView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary, lineWidth: 1))
     }
 
+    private var questionWorkAreaHeight: CGFloat {
+        let questionCount = CGFloat(max(assignment.questions.count, 1))
+        return max(160, min(240, 1_000 / questionCount))
+    }
+
+    private var worksheetHeight: CGFloat {
+        max(620, 84 + CGFloat(assignment.questions.count) * questionWorkAreaHeight + 48)
+    }
+
     private var worksheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -180,7 +189,7 @@ struct AssignmentWorkspaceView: View {
             .padding(.bottom, 20)
 
             ForEach(Array(assignment.questions.enumerated()), id: \.offset) { _, question in
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text(question)
                         .font(.body.weight(.medium))
                         .foregroundStyle(.primary)
@@ -188,14 +197,14 @@ struct AssignmentWorkspaceView: View {
                     Rectangle()
                         .fill(Color.indigo.opacity(0.16))
                         .frame(height: 1)
+                    Spacer(minLength: 0)
                 }
-                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity)
+                .frame(height: questionWorkAreaHeight, alignment: .topLeading)
             }
-
-            Spacer(minLength: 200)
         }
         .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 620, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: worksheetHeight, alignment: .topLeading)
         .background(Color(uiColor: .systemBackground))
         .overlay {
             PencilCanvas(drawing: $drawing)

@@ -198,7 +198,7 @@ private struct PlanGenerationOverlay: View {
                     Text("Creating your four-week plan")
                         .font(.title3.weight(.bold))
                         .multilineTextAlignment(.center)
-                    Text("The AI is preparing lessons, assignments, and weekly assessments for \\(studentName).")
+                    Text("The AI is preparing lessons, assignments, and weekly assessments for \(studentName).")
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Text("This may take a few minutes. Keep the app open.")
                         .font(.footnote.weight(.medium)).foregroundStyle(.secondary)
