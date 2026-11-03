@@ -1,6 +1,6 @@
 import Foundation
 
-struct Assignment: Identifiable, Hashable {
+struct Assignment: Identifiable, Codable, Hashable {
     let id: String
     let subject: String
     let title: String

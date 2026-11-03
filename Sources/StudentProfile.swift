@@ -4,14 +4,15 @@ import Combine
 struct StudentProfile: Identifiable, Codable, Hashable {
     var id: String
     var name: String
+    var age: Int?
     var gradeLevel: String
     var subjects: [String]
     var summary: String
 
     static let examples: [StudentProfile] = [
-        .init(id: "student-1", name: "Avery Johnson", gradeLevel: "Grade 5", subjects: ["Mathematics", "Science", "Reading"], summary: "Strong in reading and consistent in science. Fractions and problem-solving need extra practice."),
-        .init(id: "student-2", name: "Mateo Ruiz", gradeLevel: "Grade 4", subjects: ["Reading", "Writing", "Social Studies"], summary: "Reading comprehension is strong and writing remains steady. More structure will help in science explanations."),
-        .init(id: "student-3", name: "Sofia Patel", gradeLevel: "Grade 6", subjects: ["Algebra", "Biology", "Research"], summary: "Consistently resilient in problem-solving. Algebraic reasoning is improving with guided practice.")
+        .init(id: "student-1", name: "Avery Johnson", age: 10, gradeLevel: "Grade 5", subjects: ["Mathematics", "Science", "Reading"], summary: "Strong in reading and consistent in science. Fractions and problem-solving need extra practice."),
+        .init(id: "student-2", name: "Mateo Ruiz", age: 9, gradeLevel: "Grade 4", subjects: ["Reading", "Writing", "Social Studies"], summary: "Reading comprehension is strong and writing remains steady. More structure will help in science explanations."),
+        .init(id: "student-3", name: "Sofia Patel", age: 11, gradeLevel: "Grade 6", subjects: ["Algebra", "Biology", "Research"], summary: "Consistently resilient in problem-solving. Algebraic reasoning is improving with guided practice.")
     ]
 }
 
@@ -126,9 +127,32 @@ struct StudentLearningPlan {
     }
 }
 
+
+struct SubjectPlanInputs: Codable {
+    let targetedSkills: [String]
+    let learningOutcome: String
+    let highestAssessmentLevel: String
+    let priorAssessmentResults: [String]
+    let instructorContext: String
+}
+
+struct StudentSubjectPlan: Codable, Identifiable {
+    let studentID: String
+    let subject: String
+    let inputs: SubjectPlanInputs
+    let plan: GeneratedLearningPlan
+
+    var id: String { Self.key(studentID: studentID, subject: subject) }
+
+    static func key(studentID: String, subject: String) -> String {
+        studentID + "::" + subject.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
 @MainActor
 final class StudentProfileStore: ObservableObject {
     @Published private(set) var students: [StudentProfile]
+    @Published private(set) var subjectPlans: [String: StudentSubjectPlan]
     @Published var selectedStudentID: String {
         didSet { UserDefaults.standard.set(selectedStudentID, forKey: "selectedStudentID") }
     }
@@ -142,6 +166,12 @@ final class StudentProfileStore: ObservableObject {
             initialStudents = StudentProfile.examples
         }
         self.students = initialStudents
+        if let data = UserDefaults.standard.data(forKey: "studentSubjectPlans"),
+           let savedPlans = try? JSONDecoder().decode([String: StudentSubjectPlan].self, from: data) {
+            self.subjectPlans = savedPlans
+        } else {
+            self.subjectPlans = [:]
+        }
         self.selectedStudentID = UserDefaults.standard.string(forKey: "selectedStudentID")
             ?? initialStudents.first?.id ?? "student-1"
     }
@@ -160,9 +190,52 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    func saveSubjectPlan(_ subjectPlan: StudentSubjectPlan) {
+        subjectPlans[subjectPlan.id] = subjectPlan
+        if var profile = students.first(where: { $0.id == subjectPlan.studentID }),
+           !profile.subjects.contains(where: { $0.caseInsensitiveCompare(subjectPlan.subject) == .orderedSame }) {
+            profile.subjects.append(subjectPlan.subject)
+            if let index = students.firstIndex(where: { $0.id == profile.id }) {
+                students[index] = profile
+            }
+        }
+        persist()
+    }
+
+    func subjectPlan(for studentID: String, subject: String) -> StudentSubjectPlan? {
+        subjectPlans[StudentSubjectPlan.key(studentID: studentID, subject: subject)]
+    }
+
+    func assignments(for student: StudentProfile, subject: String? = nil) -> [Assignment] {
+        let matches: (String) -> Bool = { candidate in
+            guard let subject else {
+                return student.subjects.contains(where: {
+                    $0.localizedCaseInsensitiveContains(candidate) || candidate.localizedCaseInsensitiveContains($0)
+                })
+            }
+            return subject.localizedCaseInsensitiveContains(candidate) || candidate.localizedCaseInsensitiveContains(subject)
+        }
+        let samples = Assignment.samples.filter { matches($0.subject) }
+        let generated = subjectPlans.values
+            .filter { saved in
+                saved.studentID == student.id && (subject.map { saved.subject.caseInsensitiveCompare($0) == .orderedSame } ?? true)
+            }
+            .flatMap { saved in
+                saved.plan.weeks.flatMap { week in
+                    week.assignments.map {
+                        $0.makeAssignment(studentID: student.id, subject: saved.subject, weekNumber: week.weekNumber)
+                    }
+                }
+            }
+        return samples + generated
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(students) {
             UserDefaults.standard.set(data, forKey: "studentProfiles")
+        }
+        if let data = try? JSONEncoder().encode(subjectPlans) {
+            UserDefaults.standard.set(data, forKey: "studentSubjectPlans")
         }
     }
 }

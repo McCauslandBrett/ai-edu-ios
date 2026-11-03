@@ -4,6 +4,7 @@ import UIKit
 
 struct AIStudentContext: Codable {
     let name: String
+    let age: Int?
     let gradeLevel: String
 }
 
@@ -69,17 +70,20 @@ struct LearningPlanGenerationRequest: Encodable {
     let subject: String
     let objective: String
     let monthlyWindow: String
+    let targetedSkills: [String]
+    let highestAssessmentLevel: String
     let priorResults: [String]
+    let instructorContext: String
 }
 
-struct GeneratedLearningPlan: Decodable {
-    struct Milestone: Decodable, Identifiable {
+struct GeneratedLearningPlan: Codable {
+    struct Milestone: Codable, Identifiable {
         let id: String
         let title: String
         let date: String
         let kind: String
     }
-    struct Progress: Decodable, Identifiable {
+    struct Progress: Codable, Identifiable {
         var id: String { subject }
         let subject: String
         let completion: Double
@@ -90,8 +94,47 @@ struct GeneratedLearningPlan: Decodable {
     let subject: String
     let objective: String
     let monthlyWindow: String
+    struct PlannedActivity: Codable, Identifiable {
+        let id: String
+        let title: String
+        let subject: String
+        let prompt: String
+        let questions: [String]
+        let answerKey: [String]
+        let rubric: String
+        let points: Int
+
+        func makeAssignment(studentID: String, subject: String, weekNumber: Int, assessment: Bool = false) -> Assignment {
+            let safeSubject = subject.lowercased().unicodeScalars.map {
+                CharacterSet.alphanumerics.contains($0) ? String($0) : "-"
+            }.joined()
+            return Assignment(
+                id: ([studentID, safeSubject, String(weekNumber), id]).joined(separator: "-"),
+                subject: subject,
+                title: title,
+                dueDate: "Week \(weekNumber)",
+                points: points,
+                prompt: prompt,
+                questions: questions,
+                answerKey: answerKey,
+                rubric: rubric,
+                status: assessment ? "Assessment" : "Not started"
+            )
+        }
+    }
+
+    struct Week: Codable, Identifiable {
+        var id: Int { weekNumber }
+        let weekNumber: Int
+        let theme: String
+        let lecturePrompt: String
+        let assessment: PlannedActivity
+        let assignments: [PlannedActivity]
+    }
+
     let milestones: [Milestone]
     let progress: [Progress]
+    let weeks: [Week]
 
     var learningPlan: StudentLearningPlan {
         StudentLearningPlan(
@@ -147,7 +190,7 @@ struct LearningAIService {
         }
         guard let imageData = image.pngData() else { throw LearningAIServiceError.invalidImage }
         let body = GradeRequest(
-            student: AIStudentContext(name: student.name, gradeLevel: student.gradeLevel),
+            student: AIStudentContext(name: student.name, age: student.age, gradeLevel: student.gradeLevel),
             assignment: GradeRequest.AssignmentPayload(
                 id: assignment.id,
                 subject: assignment.subject,
@@ -169,7 +212,12 @@ struct LearningAIService {
     }
 
     func generatePlan(_ request: LearningPlanGenerationRequest) async throws -> GeneratedLearningPlan {
-        try await post("api/plans/generate", body: request)
+        let plan: GeneratedLearningPlan = try await post("api/plans/generate", body: request)
+        guard plan.weeks.count == 4,
+              plan.weeks.enumerated().allSatisfy({ $0.offset + 1 == $0.element.weekNumber && !$0.element.assignments.isEmpty }) else {
+            throw LearningAIServiceError.service("The generated plan must include four complete weeks, each with an assessment, lecture prompt, and assignment.")
+        }
+        return plan
     }
 
     private func post<Body: Encodable, Result: Decodable>(_ path: String, body: Body) async throws -> Result {
