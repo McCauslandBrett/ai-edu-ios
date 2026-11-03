@@ -202,6 +202,13 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    func deleteSubject(studentID: String, subject: String) {
+        guard let studentIndex = students.firstIndex(where: { $0.id == studentID }) else { return }
+        students[studentIndex].subjects.removeAll { $0.caseInsensitiveCompare(subject) == .orderedSame }
+        subjectPlans.removeValue(forKey: StudentSubjectPlan.key(studentID: studentID, subject: subject))
+        persist()
+    }
+
     func subjectPlan(for studentID: String, subject: String) -> StudentSubjectPlan? {
         subjectPlans[StudentSubjectPlan.key(studentID: studentID, subject: subject)]
     }

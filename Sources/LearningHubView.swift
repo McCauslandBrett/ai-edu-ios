@@ -151,6 +151,7 @@ private struct DashboardTab: View {
 private struct SubjectsTab: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     @State private var showingSubjectForm = false
+    @State private var subjectPendingDeletion: String?
     let student: StudentProfile
 
     var body: some View {
@@ -159,48 +160,75 @@ private struct SubjectsTab: View {
                 ForEach(student.subjects, id: \.self) { subject in
                     let saved = profiles.subjectPlan(for: student.id, subject: subject)
                     let fallback = StudentLearningPlan.forStudent(student.id, subject: subject)
-                    NavigationLink {
-                        SubjectPlanView(
-                            student: student,
-                            subject: subject,
-                            saved: saved,
-                            fallback: fallback,
-                            assignments: profiles.assignments(for: student, subject: subject)
-                        )
-                    } label: {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Label(subject, systemImage: icon(for: subject)).font(.headline)
-                                Spacer()
+                    HStack(spacing: 8) {
+                        NavigationLink {
+                            SubjectPlanView(
+                                student: student,
+                                subject: subject,
+                                saved: saved,
+                                fallback: fallback,
+                                assignments: profiles.assignments(for: student, subject: subject)
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Label(subject, systemImage: icon(for: subject)).font(.headline)
+                                    Spacer()
+                                    if let saved {
+                                        Text("\(saved.plan.progress.first?.completion ?? 0, specifier: "%.0f")%")
+                                            .font(.caption.weight(.bold)).foregroundStyle(.indigo)
+                                    } else {
+                                        Text("Plan template").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
                                 if let saved {
-                                    Text("\(saved.plan.progress.first?.completion ?? 0, specifier: "%.0f")%")
-                                        .font(.caption.weight(.bold)).foregroundStyle(.indigo)
+                                    let average = saved.plan.progress.isEmpty ? 0 :
+                                        saved.plan.progress.map(\.completion).reduce(0, +) / Double(saved.plan.progress.count)
+                                    ProgressView(value: average, total: 100).tint(.indigo)
+                                    Text(saved.plan.objective).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                 } else {
-                                    Text("Plan template").font(.caption).foregroundStyle(.secondary)
+                                    Text(fallback.focus).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                 }
                             }
-                            if let saved {
-                                let average = saved.plan.progress.isEmpty ? 0 :
-                                    saved.plan.progress.map(\.completion).reduce(0, +) / Double(saved.plan.progress.count)
-                                ProgressView(value: average, total: 100).tint(.indigo)
-                                Text(saved.plan.objective).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            } else {
-                                Text(fallback.focus).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            }
+                            .padding(.vertical, 8)
                         }
-                        .padding(.vertical, 8)
+
+                        Button {
+                            subjectPendingDeletion = subject
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.red)
+                                .frame(width: 40, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Delete \(subject)")
                     }
-                }
-                .onDelete { offsets in
-                    var profile = student
-                    profile.subjects.remove(atOffsets: offsets)
-                    profiles.save(profile)
                 }
             } header: {
                 Text("\(student.name)'s subjects")
             } footer: {
                 Text("Tap a subject to view its plan and assignments. Add a subject to generate a personalized four-week plan.")
             }
+        }
+        .confirmationDialog(
+            "Delete \(subjectPendingDeletion ?? "subject")?",
+            isPresented: Binding(
+                get: { subjectPendingDeletion != nil },
+                set: { if !$0 { subjectPendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Subject", role: .destructive) {
+                if let subject = subjectPendingDeletion {
+                    profiles.deleteSubject(studentID: student.id, subject: subject)
+                }
+                subjectPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) { subjectPendingDeletion = nil }
+        } message: {
+            Text("This removes the subject and its generated learning plan from this student's profile. Saved handwritten assignment work is kept.")
         }
         .safeAreaInset(edge: .bottom) {
             Button { showingSubjectForm = true } label: {
