@@ -1,0 +1,47 @@
+import Foundation
+
+struct TutorChatMessage: Identifiable {
+    enum Role: String, Equatable {
+        case user
+        case assistant
+    }
+
+    let id = UUID()
+    let role: Role
+    let text: String
+    var isVisible = true
+}
+
+struct TutorChatRequest: Encodable {
+    struct Message: Encodable {
+        let role: String
+        let content: String
+    }
+
+    let student: AIStudentContext
+    let subject: String
+    let weekNumber: Int
+    let lecturePrompt: String
+    let messages: [Message]
+    let canvasItems: [String]
+    let imageBase64: String?
+}
+
+struct TutorChatResponse: Decodable {
+    let reply: String
+    let canvasItems: [String]
+    let imageBase64: String?
+    let imageError: String?
+}
+
+struct TutorChatService {
+    private let client: LearningAIHTTPClient
+
+    init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {
+        self.client = client
+    }
+
+    func send(_ request: TutorChatRequest) async throws -> TutorChatResponse {
+        try await client.post("api/tutor/chat", body: request)
+    }
+}

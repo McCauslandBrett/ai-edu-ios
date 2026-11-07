@@ -79,6 +79,7 @@ private struct SubjectWeekSection: View {
     let week: GeneratedLearningPlan.Week
     let trackedSkills: [String]
     @State private var didCopyPrompt = false
+    @State private var showingTutorChat = false
 
     var body: some View {
         Section("Week \(week.weekNumber) · \(week.theme)") {
@@ -98,8 +99,23 @@ private struct SubjectWeekSection: View {
                     .accessibilityLabel(didCopyPrompt ? "Prompt copied" : "Copy tutor lecture prompt")
                 }
                 Text(week.lecturePrompt).font(.subheadline)
+                Button {
+                    showingTutorChat = true
+                } label: {
+                    Label("Open whiteboard chat", systemImage: "scribble.variable")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
             }
             .padding(.vertical, 6)
+            .fullScreenCover(isPresented: $showingTutorChat) {
+                TutorChatView(
+                    student: student,
+                    subject: subject,
+                    weekNumber: week.weekNumber,
+                    lecturePrompt: week.lecturePrompt
+                )
+            }
 
             NavigationLink {
                 AssignmentWorkspaceView(assignment: week.assessment.makeAssignment(
