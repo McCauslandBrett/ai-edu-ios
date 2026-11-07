@@ -99,6 +99,22 @@ private struct SubjectWeekSection: View {
                     .accessibilityLabel(didCopyPrompt ? "Prompt copied" : "Copy tutor lecture prompt")
                 }
                 Text(week.lecturePrompt).font(.subheadline)
+                if let video = week.youtubeVideo, let destination = video.destination {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Weekly video", systemImage: "play.rectangle.fill")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                        Link(destination: destination) {
+                            Label(video.title, systemImage: "play.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .multilineTextAlignment(.leading)
+                        }
+                        Text("\(video.channel) · \(video.reason)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                }
                 Button {
                     showingTutorChat = true
                 } label: {

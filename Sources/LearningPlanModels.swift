@@ -76,11 +76,21 @@ struct GeneratedLearningPlan: Codable {
         }
     }
 
+    struct SuggestedVideo: Codable, Hashable {
+        let title: String
+        let channel: String
+        let url: String
+        let reason: String
+
+        var destination: URL? { URL(string: url) }
+    }
+
     struct Week: Codable, Identifiable {
         var id: Int { weekNumber }
         let weekNumber: Int
         let theme: String
         let lecturePrompt: String
+        var youtubeVideo: SuggestedVideo? = nil
         let assessment: PlannedActivity
         let assignments: [PlannedActivity]
     }
