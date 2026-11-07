@@ -12,9 +12,10 @@ final class StudentProfileStore: ObservableObject {
         didSet { persistence.saveSelectedStudentID(selectedStudentID) }
     }
 
-    private let persistence: StudentProfilePersistence
+    private let persistence: any StudentProfilePersisting
+    private let assignmentCatalog = StudentAssignmentCatalog()
 
-    init(persistence: StudentProfilePersistence = StudentProfilePersistence()) {
+    init(persistence: any StudentProfilePersisting = StudentProfilePersistence()) {
         self.persistence = persistence
         let initialStudents = persistence.loadStudents()
         self.students = initialStudents
@@ -54,7 +55,7 @@ final class StudentProfileStore: ObservableObject {
     func saveAssignmentOverride(_ assignment: Assignment, studentID: String) {
         var studentAssignment = assignment
         studentAssignment.studentID = studentID
-        assignmentOverrides[overrideKey(assignment.id, studentID: studentID)] = studentAssignment
+        assignmentOverrides[assignmentCatalog.overrideKey(assignment.id, studentID: studentID)] = studentAssignment
         if let index = retryAssignments.firstIndex(where: { $0.id == assignment.id && $0.studentID == studentID }) {
             retryAssignments[index] = studentAssignment
         }
@@ -67,7 +68,7 @@ final class StudentProfileStore: ObservableObject {
               var results = saved.competencyResults else { return }
         results.removeValue(forKey: assignment.id)
         saved.competencyResults = results
-        updateCompetencyProgress(in: &saved)
+        refreshCompetencyProgress(in: &saved)
         subjectPlans[key] = saved
         persist()
     }
@@ -115,7 +116,7 @@ final class StudentProfileStore: ObservableObject {
         var results = saved.competencyResults ?? [:]
         results[assignment.id] = grade.items.map(\.isCorrect)
         saved.competencyResults = results
-        updateCompetencyProgress(in: &saved)
+        refreshCompetencyProgress(in: &saved)
         subjectPlans[key] = saved
     }
 
@@ -175,158 +176,28 @@ final class StudentProfileStore: ObservableObject {
     }
 
     func assignments(for student: StudentProfile, subject: String? = nil) -> [Assignment] {
-        applyAssignmentOverrides(
-            sampleAssignments(for: student, subject: subject)
-                + generatedAssignments(for: student, subject: subject)
-                + retryAttempts(for: student, subject: subject),
-            studentID: student.id
+        assignmentCatalog.assignments(
+            for: student,
+            subject: subject,
+            plans: Array(subjectPlans.values),
+            retries: retryAssignments,
+            overrides: assignmentOverrides
         )
     }
 
-    private func applyAssignmentOverrides(_ assignments: [Assignment], studentID: String) -> [Assignment] {
-        assignments.map { assignmentOverrides[overrideKey($0.id, studentID: studentID)] ?? $0 }
-    }
-
-    private func overrideKey(_ assignmentID: String, studentID: String) -> String {
-        studentID + "::" + assignmentID
-    }
-
-    private func sampleAssignments(for student: StudentProfile, subject: String?) -> [Assignment] {
-        guard isExampleStudent(student) else { return [] }
-        return Assignment.samples.filter { assignment in
-            if let subject {
-                return subjectsMatch(subject, assignment.subject)
-            }
-            return student.subjects.contains { subjectsMatch($0, assignment.subject) }
-        }
-    }
-
-    private func generatedAssignments(for student: StudentProfile, subject: String?) -> [Assignment] {
-        subjectPlans.values
-            .filter { saved in
-                saved.studentID == student.id && planMatchesSubject(saved, subject: subject)
-            }
-            .flatMap { assignments(from: $0) }
-    }
-
-    private func assignments(from saved: StudentSubjectPlan) -> [Assignment] {
-        let trackedSkills = saved.plan.progress.map(\.subject)
-        return saved.plan.weeks.flatMap { week in
-            let assessment = week.assessment.makeAssignment(
-                studentID: saved.studentID,
-                subject: saved.subject,
-                weekNumber: week.weekNumber,
-                assessment: true,
-                trackedSkills: trackedSkills
-            )
-            let assignments = week.assignments.map {
-                $0.makeAssignment(
-                    studentID: saved.studentID,
-                    subject: saved.subject,
-                    weekNumber: week.weekNumber,
-                    trackedSkills: trackedSkills
-                )
-            }
-            return [assessment] + assignments
-        }
-    }
-
-    private func retryAttempts(for student: StudentProfile, subject: String?) -> [Assignment] {
-        retryAssignments.filter { retry in
-            retry.studentID == student.id && subjectMatches(retry.subject, requestedSubject: subject)
-        }
-    }
-
-    private func isExampleStudent(_ student: StudentProfile) -> Bool {
-        StudentProfile.examples.contains { $0.id == student.id }
-    }
-
-    private func planMatchesSubject(_ plan: StudentSubjectPlan, subject: String?) -> Bool {
-        guard let subject else { return true }
-        return plan.subject.caseInsensitiveCompare(subject) == .orderedSame
-    }
-
-    private func subjectMatches(_ subject: String, requestedSubject: String?) -> Bool {
-        guard let requestedSubject else { return true }
-        return subject.caseInsensitiveCompare(requestedSubject) == .orderedSame
-    }
-
-    private func subjectsMatch(_ lhs: String, _ rhs: String) -> Bool {
-        lhs.localizedCaseInsensitiveContains(rhs) || rhs.localizedCaseInsensitiveContains(lhs)
-    }
-
-    private func updateCompetencyProgress(in saved: inout StudentSubjectPlan) {
-        let planAssignments = assignments(from: saved)
+    private func refreshCompetencyProgress(in saved: inout StudentSubjectPlan) {
+        let plannedAssignments = assignmentCatalog.assignments(from: saved)
         let relatedRetries = retryAssignments.filter {
             $0.studentID == saved.studentID && $0.subject.caseInsensitiveCompare(saved.subject) == .orderedSame
         }
-        let allAssignments = applyAssignmentOverrides(planAssignments + relatedRetries, studentID: saved.studentID)
-        let skillTotals = questionCounts(in: allAssignments)
-        let results = saved.competencyResults ?? [:]
-
-        for index in saved.plan.progress.indices {
-            var progress = saved.plan.progress[index]
-            let skill = progress.subject
-            updateProgress(
-                for: &progress,
-                assignments: allAssignments,
-                skillTotal: skillTotals[skill] ?? 0,
-                results: results
-            )
-            saved.plan.progress[index] = progress
-        }
-    }
-
-    private func updateProgress(
-        for progress: inout GeneratedLearningPlan.Progress,
-        assignments: [Assignment],
-        skillTotal: Int,
-        results: [String: [Bool]]
-    ) {
-        guard skillTotal > 0 else { return }
-        let gradedAssignments = assignments.filter {
-            $0.questionSkills?.contains(progress.subject) == true && results[$0.id] != nil
-        }
-        guard !gradedAssignments.isEmpty else { return }
-
-        let correctCount = correctAnswers(
-            for: progress.subject,
-            in: gradedAssignments,
-            results: results
+        let allAssignments = assignmentCatalog.applyOverrides(
+            plannedAssignments + relatedRetries,
+            studentID: saved.studentID,
+            overrides: assignmentOverrides
         )
-        let completion = min(100, Double(correctCount) / Double(skillTotal) * 100)
-        progress.completion = completion
-        progress.status = completion >= 80 ? "Competent" : "Developing"
-        progress.nextMilestone = nextMilestone(for: progress.subject, completion: completion)
-    }
-
-    private func correctAnswers(
-        for skill: String,
-        in assignments: [Assignment],
-        results: [String: [Bool]]
-    ) -> Int {
-        assignments.reduce(0) { total, assignment in
-            let flags = results[assignment.id] ?? []
-            let skills = assignment.questionSkills ?? []
-            let correct = flags.enumerated().filter { questionIndex, isCorrect in
-                isCorrect && skills.indices.contains(questionIndex) && skills[questionIndex] == skill
-            }.count
-            return total + correct
-        }
-    }
-
-    private func nextMilestone(for skill: String, completion: Double) -> String {
-        completion >= 80
-            ? "Apply \(skill) in a new context"
-            : "Practice more \(skill) questions"
-    }
-
-    private func questionCounts(in assignments: [Assignment]) -> [String: Int] {
-        assignments.reduce(into: [:]) { counts, assignment in
-            for skill in assignment.questionSkills ?? [] {
-                counts[skill, default: 0] += 1
-            }
-        }
+        var plan = saved.plan
+        SubjectCompetencyTracker().update(&plan, assignments: allAssignments, results: saved.competencyResults ?? [:])
+        saved.plan = plan
     }
 
     private func persist() {

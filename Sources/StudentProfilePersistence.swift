@@ -1,7 +1,18 @@
 import Foundation
 
+protocol StudentProfilePersisting {
+    func loadStudents() -> [StudentProfile]
+    func loadSubjectPlans() -> [String: StudentSubjectPlan]
+    func loadRetryAssignments() -> [Assignment]
+    func loadActivityEvents() -> [StudentActivityEvent]
+    func loadAssignmentOverrides() -> [String: Assignment]
+    func loadSelectedStudentID(fallback: String) -> String
+    func save(students: [StudentProfile], subjectPlans: [String: StudentSubjectPlan], retryAssignments: [Assignment], activityEvents: [StudentActivityEvent], assignmentOverrides: [String: Assignment])
+    func saveSelectedStudentID(_ id: String)
+}
+
 /// Reads and writes the app's local student and subject-plan records.
-struct StudentProfilePersistence {
+struct StudentProfilePersistence: StudentProfilePersisting {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

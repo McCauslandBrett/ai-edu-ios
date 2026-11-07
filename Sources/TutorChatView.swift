@@ -11,23 +11,23 @@ struct TutorChatView: View {
     let lecturePrompt: String
 
     @StateObject private var speech = TutorSpeechController()
-    @State private var messages: [TutorChatMessage] = []
-    @State private var canvasItems: [String] = []
-    @State private var illustration: UIImage?
-    @State private var drawing = PKDrawing()
+    @StateObject private var model: TutorChatSessionModel
     @State private var canvasSize = CGSize.zero
-    @State private var isSending = false
-    @State private var didStart = false
-    @State private var errorMessage: String?
-    @State private var illustrationError: String?
     @State private var showsConversation = false
     @State private var selectedTool: PencilCanvasToolMode = .pen
-    @State private var tutorTurnCount = 0
-    @State private var sessionReadyToComplete = false
-    @State private var completionReason: String?
-    @State private var didCompleteSession = false
 
-    private let maximumTutorTurns = 5
+    init(student: StudentProfile, subject: String, weekNumber: Int, lecturePrompt: String) {
+        self.student = student
+        self.subject = subject
+        self.weekNumber = weekNumber
+        self.lecturePrompt = lecturePrompt
+        _model = StateObject(wrappedValue: TutorChatSessionModel(
+            student: student,
+            subject: subject,
+            weekNumber: weekNumber,
+            lecturePrompt: lecturePrompt
+        ))
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -54,7 +54,7 @@ struct TutorChatView: View {
         .ignoresSafeArea()
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .task { await beginLesson() }
+        .task { await model.beginLesson { speech.speak($0) } }
         .onChange(of: speech.finalTranscript) { _, _ in
             handleFinalTranscript()
         }
@@ -63,14 +63,14 @@ struct TutorChatView: View {
     private func fullScreenWhiteboard(size: CGSize) -> some View {
         ZStack {
             Color.white
-            if let illustration {
+            if let illustration = model.illustration {
                 Image(uiImage: illustration)
                     .resizable()
                     .scaledToFit()
                     .frame(width: size.width, height: size.height)
             }
             PencilCanvas(
-                drawing: $drawing,
+                drawing: $model.drawing,
                 showsToolPicker: false,
                 toolMode: selectedTool,
                 drawingPolicy: .anyInput
@@ -146,7 +146,7 @@ struct TutorChatView: View {
 
     @ViewBuilder
     private var agentNotes: some View {
-        if let illustrationError {
+        if let illustrationError = model.illustrationError {
             Text(illustrationError)
                 .font(.caption).padding(8)
                 .background(.regularMaterial, in: Capsule())
@@ -157,30 +157,30 @@ struct TutorChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(messages.filter(\.isVisible)) { message in
+                    ForEach(model.messages.filter(\.isVisible)) { message in
                         TutorMessageBubble(message: message)
                             .id(message.id)
                     }
-                    if isSending {
+                    if model.isSending {
                         HStack(spacing: 8) {
                             ProgressView()
                             Text("Tutor is thinking…").font(.subheadline).foregroundStyle(.secondary)
                         }
                         .padding(12)
                     }
-                    if let errorMessage {
+                    if let errorMessage = model.errorMessage {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(errorMessage).font(.subheadline).foregroundStyle(.red)
                             Button("Try again") { Task { await sendToTutor() } }
-                                .disabled(isSending)
+                                .disabled(model.isSending)
                         }
                         .padding(12)
                     }
                 }
                 .padding(14)
             }
-            .onChange(of: messages.count) { _, _ in
-                guard let lastMessage = messages.last(where: \.isVisible) else { return }
+            .onChange(of: model.messages.count) { _, _ in
+                guard let lastMessage = model.messages.last(where: \.isVisible) else { return }
                 withAnimation { proxy.scrollTo(lastMessage.id, anchor: .bottom) }
             }
         }
@@ -191,7 +191,7 @@ struct TutorChatView: View {
     private var voiceControls: some View {
         VStack(spacing: 8) {
             voiceStatus
-            if sessionReadyToComplete {
+            if model.sessionReadyToComplete {
                 Button(action: completeSession) {
                     Label("Complete session", systemImage: "checkmark.seal.fill")
                         .font(.title3.weight(.bold))
@@ -200,7 +200,7 @@ struct TutorChatView: View {
                         .frame(height: 58)
                         .background(Color.green, in: Capsule())
                 }
-                .disabled(didCompleteSession)
+                .disabled(model.didCompleteSession)
             } else {
                 HStack(spacing: 10) {
                     Button {
@@ -217,7 +217,7 @@ struct TutorChatView: View {
                         .frame(height: 66)
                         .background(speech.isRecording ? Color.red : Color.indigo, in: Capsule())
                     }
-                    .disabled(isSending || speech.isTranscribing || speech.isSpeaking)
+                    .disabled(model.isSending || speech.isTranscribing || speech.isSpeaking)
                     .accessibilityLabel(speech.isRecording ? "Finish speaking" : "Talk to the tutor")
 
                     Menu {
@@ -242,7 +242,7 @@ struct TutorChatView: View {
                             .frame(height: 42)
                             .background(.thinMaterial, in: Capsule())
                     }
-                    .disabled(isSending || speech.isTranscribing || speech.isRecording)
+                    .disabled(model.isSending || speech.isTranscribing || speech.isRecording)
 
                     Button {
                         speech.stopSpeaking()
@@ -254,7 +254,7 @@ struct TutorChatView: View {
                             .frame(height: 42)
                             .background(.thinMaterial, in: Capsule())
                     }
-                    .disabled(isSending || speech.isTranscribing || speech.isRecording)
+                    .disabled(model.isSending || speech.isTranscribing || speech.isRecording)
                 }
             }
         }
@@ -265,13 +265,13 @@ struct TutorChatView: View {
 
     @ViewBuilder
     private var voiceStatus: some View {
-        if sessionReadyToComplete {
+        if model.sessionReadyToComplete {
             Label("Lesson complete · ready to finish", systemImage: "checkmark.circle.fill")
                 .font(.subheadline.weight(.semibold))
-        } else if isSending || speech.isTranscribing {
+        } else if model.isSending || speech.isTranscribing {
             HStack(spacing: 8) {
                 ProgressView()
-                Text(isSending ? "Tutor is thinking…" : "Checking Apple Speech, then online if allowed…")
+                Text(model.isSending ? "Tutor is thinking…" : "Checking Apple Speech, then online if allowed…")
                     .font(.subheadline.weight(.medium))
             }
         } else if speech.isSpeaking {
@@ -285,30 +285,16 @@ struct TutorChatView: View {
                 .font(.subheadline.weight(.medium))
         }
 
-        if let message = speech.errorMessage ?? errorMessage {
+        if let message = speech.errorMessage ?? model.errorMessage {
             Text(message)
                 .font(.caption).foregroundStyle(.red)
                 .multilineTextAlignment(.center)
         }
     }
 
-    @MainActor
-    private func beginLesson() async {
-        guard !didStart else { return }
-        didStart = true
-        messages.append(TutorChatMessage(
-            role: .user,
-            text: "Start the lesson by greeting the student and asking one engaging first question.",
-            isVisible: false
-        ))
-        await sendToTutor()
-    }
-
     private func handleFinalTranscript() {
-        let text = speech.takeFinalTranscript().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isSending else { return }
-        messages.append(TutorChatMessage(role: .user, text: text))
-        errorMessage = nil
+        let text = speech.takeFinalTranscript()
+        guard model.receiveTranscript(text) else { return }
         Task { await sendToTutor() }
     }
 
@@ -322,94 +308,23 @@ struct TutorChatView: View {
 
     @MainActor
     private func sendToTutor(action: String? = nil) async {
-        guard !isSending, !sessionReadyToComplete else { return }
-        isSending = true
-        errorMessage = nil
-        defer { isSending = false }
-
-        let request = TutorChatRequest(
-            student: AIStudentContext(name: student.name, age: student.age, gradeLevel: student.gradeLevel),
-            subject: subject,
-            weekNumber: weekNumber,
-            lecturePrompt: lecturePrompt,
-            action: action,
-            tutorTurnCount: tutorTurnCount,
-            messages: messages.suffix(24).map { TutorChatRequest.Message(role: $0.role.rawValue, content: $0.text) },
-            canvasItems: canvasItems,
-            imageBase64: whiteboardImageBase64()
+        let image = TutorWhiteboardSnapshotEncoder().base64(
+            illustration: model.illustration,
+            drawing: model.drawing,
+            canvasSize: canvasSize
         )
-
-        do {
-            let response = try await TutorChatService().send(request)
-            tutorTurnCount += 1
-            if response.sessionComplete || tutorTurnCount >= maximumTutorTurns {
-                sessionReadyToComplete = true
-                completionReason = response.completionReason ?? "Finished after \(tutorTurnCount) tutor turns."
-            }
-            messages.append(TutorChatMessage(role: .assistant, text: response.reply))
-            canvasItems.append(contentsOf: response.canvasItems)
-            canvasItems = Array(canvasItems.suffix(12))
-            speech.speak(response.reply)
-            if action != "check-whiteboard",
-               let encodedImage = response.imageBase64,
-               let data = Data(base64Encoded: encodedImage),
-               let newIllustration = UIImage(data: data) {
-                illustration = newIllustration
-                drawing = PKDrawing()
-            }
-            illustrationError = response.imageError
-        } catch {
-            errorMessage = error.localizedDescription
-            speech.speak("I couldn't reach your tutor. Please ask a grown-up to help.")
-        }
+        await model.send(action: action, imageBase64: image) { speech.speak($0) }
     }
 
     @MainActor
     private func completeSession() {
-        guard sessionReadyToComplete, !didCompleteSession else { return }
-        didCompleteSession = true
-        profiles.recordTutorSession(
-            studentID: student.id,
-            subject: subject,
-            weekNumber: weekNumber,
-            tutorTurnCount: tutorTurnCount,
-            completionReason: completionReason ?? "Tutor session completed."
-        )
+        guard model.complete(profiles: profiles) else { return }
         speech.stopSpeaking()
         dismiss()
     }
-
-    private func whiteboardImageBase64() -> String? {
-        guard canvasSize.width > 0, canvasSize.height > 0,
-              illustration != nil || !drawing.bounds.isEmpty else { return nil }
-        let scale = min(1, 1_024 / max(canvasSize.width, canvasSize.height))
-        let outputSize = CGSize(width: canvasSize.width * scale, height: canvasSize.height * scale)
-        let outputBounds = CGRect(origin: .zero, size: outputSize)
-        let sourceBounds = CGRect(origin: .zero, size: canvasSize)
-        let renderer = UIGraphicsImageRenderer(size: outputSize)
-        let image = renderer.image { context in
-            UIColor.white.setFill()
-            context.cgContext.fill(outputBounds)
-            if let illustration {
-                illustration.draw(in: aspectFitRect(for: illustration.size, inside: outputBounds))
-            }
-            drawing.image(from: sourceBounds, scale: scale).draw(in: outputBounds)
-        }
-        return image.pngData()?.base64EncodedString()
-    }
-
-    private func aspectFitRect(for imageSize: CGSize, inside bounds: CGRect) -> CGRect {
-        guard imageSize.width > 0, imageSize.height > 0 else { return bounds }
-        let scale = min(bounds.width / imageSize.width, bounds.height / imageSize.height)
-        let fittedSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        return CGRect(
-            x: bounds.midX - fittedSize.width / 2,
-            y: bounds.midY - fittedSize.height / 2,
-            width: fittedSize.width,
-            height: fittedSize.height
-        )
-    }
 }
+
+
 
 private struct TutorMessageBubble: View {
     let message: TutorChatMessage

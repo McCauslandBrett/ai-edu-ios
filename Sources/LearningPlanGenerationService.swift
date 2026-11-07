@@ -1,5 +1,9 @@
+protocol LearningPlanGenerating {
+    func generate(_ request: LearningPlanGenerationRequest) async throws -> GeneratedLearningPlan
+}
+
 /// Generates and validates the four-week plan returned by the curriculum API.
-struct LearningPlanGenerationService {
+struct LearningPlanGenerationService: LearningPlanGenerating {
     private let client: LearningAIHTTPClient
 
     init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {

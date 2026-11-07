@@ -1,5 +1,5 @@
 /// Sends requests for original assignments and returns the generated assignment models.
-struct AssignmentGenerationService {
+struct AssignmentGenerationService: AssignmentGenerationProviding {
     private let client: LearningAIHTTPClient
 
     init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {

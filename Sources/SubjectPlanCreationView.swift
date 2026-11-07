@@ -5,6 +5,7 @@ struct SubjectPlanCreationView: View {
     let student: StudentProfile
     let onCreate: (StudentSubjectPlan) -> Void
     let onClose: () -> Void
+    private let planGenerator: any LearningPlanGenerating
 
     @State private var subject = ""
     @State private var targetedSkills = ""
@@ -14,6 +15,18 @@ struct SubjectPlanCreationView: View {
     @State private var instructorContext = ""
     @State private var isGenerating = false
     @State private var errorMessage: String?
+
+    init(
+        student: StudentProfile,
+        onCreate: @escaping (StudentSubjectPlan) -> Void,
+        onClose: @escaping () -> Void,
+        planGenerator: any LearningPlanGenerating = LearningPlanGenerationService()
+    ) {
+        self.student = student
+        self.onCreate = onCreate
+        self.onClose = onClose
+        self.planGenerator = planGenerator
+    }
 
     var body: some View {
         NavigationStack {
@@ -134,7 +147,7 @@ struct SubjectPlanCreationView: View {
         let submission = makeSubmission(subject: cleanedSubject, previous: previous)
 
         do {
-            let plan = try await LearningPlanGenerationService().generate(submission.request)
+            let plan = try await planGenerator.generate(submission.request)
             onCreate(StudentSubjectPlan(
                 studentID: student.id,
                 subject: cleanedSubject,

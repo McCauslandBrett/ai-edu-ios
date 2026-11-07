@@ -1,6 +1,6 @@
 import Foundation
 
-struct AssignmentAdjustmentService {
+struct AssignmentAdjustmentService: AssignmentAdjusting {
     private let client: LearningAIHTTPClient
 
     init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {

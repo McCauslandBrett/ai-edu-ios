@@ -1,7 +1,7 @@
 import Foundation
 
 /// Persists AI grading results by assignment ID on this device.
-struct AssignmentGradeStore {
+struct AssignmentGradeStore: AssignmentGradePersisting {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

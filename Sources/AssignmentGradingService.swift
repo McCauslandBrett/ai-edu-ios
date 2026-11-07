@@ -1,7 +1,7 @@
 import PencilKit
 
 /// Coordinates handwriting preparation and the assignment-grading API operation.
-struct AssignmentGradingService {
+struct AssignmentGradingService: AssignmentGradingProviding {
     private let client: LearningAIHTTPClient
 
     init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {

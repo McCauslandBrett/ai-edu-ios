@@ -11,11 +11,13 @@ final class TutorSpeechController: NSObject, ObservableObject {
     @Published private(set) var finalTranscript = ""
     @Published private(set) var errorMessage: String?
     @Published var allowsOnlineFallback: Bool {
-        didSet { UserDefaults.standard.set(allowsOnlineFallback, forKey: Self.onlineFallbackPreferenceKey) }
+        didSet { preferences.set(allowsOnlineFallback, forKey: Self.onlineFallbackPreferenceKey) }
     }
 
     private static let onlineFallbackPreferenceKey = "TutorAllowsOnlineSpeechFallback"
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private let transcriber: any TutorTranscribing
+    private let preferences: UserDefaults
     private let synthesizer = AVSpeechSynthesizer()
     private var recorder: AVAudioRecorder?
     private var recordingURL: URL?
@@ -23,8 +25,13 @@ final class TutorSpeechController: NSObject, ObservableObject {
     private var recognitionContinuation: CheckedContinuation<String, Error>?
     private var recognitionTimeoutTask: Task<Void, Never>?
 
-    override init() {
-        allowsOnlineFallback = UserDefaults.standard.object(forKey: Self.onlineFallbackPreferenceKey) as? Bool ?? true
+    init(
+        transcriber: any TutorTranscribing = TutorChatService(),
+        preferences: UserDefaults = .standard
+    ) {
+        self.transcriber = transcriber
+        self.preferences = preferences
+        allowsOnlineFallback = preferences.object(forKey: Self.onlineFallbackPreferenceKey) as? Bool ?? true
         super.init()
         synthesizer.delegate = self
     }
@@ -162,7 +169,7 @@ final class TutorSpeechController: NSObject, ObservableObject {
 
         do {
             let audio = try Data(contentsOf: url)
-            let result = try await TutorChatService().transcribe(audio: audio)
+            let result = try await transcriber.transcribe(audio: audio)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !result.isEmpty else {
                 errorMessage = "I didn't catch that. Tap the microphone and try again."

@@ -47,7 +47,11 @@ private struct TutorTranscriptionResponse: Decodable {
     let text: String
 }
 
-struct TutorChatService {
+protocol TutorTranscribing {
+    func transcribe(audio: Data) async throws -> String
+}
+
+struct TutorChatService: TutorChatProviding, TutorTranscribing {
     private let client: LearningAIHTTPClient
 
     init(client: LearningAIHTTPClient = LearningAIHTTPClient()) {
