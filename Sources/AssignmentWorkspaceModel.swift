@@ -26,7 +26,8 @@ final class AssignmentWorkspaceModel: ObservableObject {
         self.gradeStore = dependencies.gradeStore
     }
 
-    func restore(for profiles: StudentProfileStore) {
+    func restore(for profiles: StudentProfileStore, studentID: String) {
+        assignment = profiles.assignmentWithSavedChanges(assignment, studentID: studentID)
         grade = gradeStore.load(assignmentID: assignment.id)
         retryAssignment = profiles.retryAssignments.last { $0.parentAssignmentID == assignment.id }
     }
@@ -47,7 +48,24 @@ final class AssignmentWorkspaceModel: ObservableObject {
     }
 
     func applyChange(_ request: String, student: StudentProfile, profiles: StudentProfileStore) async throws {
-        let updated = try await adjuster.adjust(assignment, for: student, request: request)
+        let adjusted = try await adjuster.adjust(assignment, for: student, request: request)
+        let updated = Assignment(
+            id: assignment.id,
+            subject: adjusted.subject,
+            title: adjusted.title,
+            dueDate: adjusted.dueDate,
+            points: adjusted.points,
+            prompt: adjusted.prompt,
+            questions: adjusted.questions,
+            answerKey: adjusted.answerKey,
+            rubric: adjusted.rubric,
+            status: adjusted.status,
+            questionSkills: adjusted.questionSkills,
+            studentID: student.id,
+            parentAssignmentID: assignment.parentAssignmentID,
+            questionIllustrations: adjusted.questionIllustrations,
+            writingSpaceMultipliers: adjusted.writingSpaceMultipliers
+        )
         assignment = updated
         grade = nil
         gradeStore.delete(assignmentID: updated.id)

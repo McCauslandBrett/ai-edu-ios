@@ -62,6 +62,14 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    func assignmentWithSavedChanges(_ assignment: Assignment, studentID: String) -> Assignment {
+        assignmentCatalog.applyOverrides(
+            [assignment],
+            studentID: studentID,
+            overrides: assignmentOverrides
+        ).first ?? assignment
+    }
+
     func clearRecordedGrade(for assignment: Assignment, studentID: String) {
         guard let key = subjectPlanKey(for: assignment.subject, studentID: studentID),
               var saved = subjectPlans[key],

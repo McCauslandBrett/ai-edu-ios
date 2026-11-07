@@ -88,7 +88,8 @@ struct AssignmentWorkspaceView: View {
     }
 
     private func restoreWorkspace() {
+        let studentID = model.assignment.studentID ?? profiles.selectedStudent.id
+        model.restore(for: profiles, studentID: studentID)
         drawing = documents.drawing(for: model.assignment.id)
-        model.restore(for: profiles)
     }
 }
