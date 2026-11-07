@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProfileTab: View {
+    @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let onEdit: () -> Void
 
@@ -23,7 +24,7 @@ struct ProfileTab: View {
             Section("Student summary") {
                 Text(student.summary)
                     .foregroundStyle(.secondary)
-                LabeledContent("Subjects", value: "\(student.subjects.count)")
+                LabeledContent("Subjects", value: "\(profiles.subjects(for: student).count)")
             }
             Section("Profiles") {
                 Text("Use the student menu in the top right to switch profiles or add another student.")
@@ -59,14 +60,24 @@ struct ProgressRow: View {
 struct ProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     let original: StudentProfile?
+    let canDeleteStudent: Bool
+    let onDelete: (StudentProfile) -> Void
     let onSave: (StudentProfile) -> Void
+    @State private var confirmingDelete = false
     @State private var name: String
     @State private var age: String
     @State private var grade: String
     @State private var summary: String
 
-    init(profile: StudentProfile?, onSave: @escaping (StudentProfile) -> Void) {
+    init(
+        profile: StudentProfile?,
+        canDeleteStudent: Bool = false,
+        onDelete: @escaping (StudentProfile) -> Void = { _ in },
+        onSave: @escaping (StudentProfile) -> Void
+    ) {
         original = profile
+        self.canDeleteStudent = canDeleteStudent
+        self.onDelete = onDelete
         self.onSave = onSave
         _name = State(initialValue: profile?.name ?? "")
         _age = State(initialValue: profile?.age.map(String.init) ?? "")
@@ -84,6 +95,19 @@ struct ProfileEditor: View {
                 }
                 Section("Learning summary") {
                     TextEditor(text: $summary).frame(minHeight: 120)
+                }
+                if let original {
+                    Section("Delete student") {
+                        Button("Delete \(original.name)", role: .destructive) {
+                            confirmingDelete = true
+                        }
+                        .disabled(!canDeleteStudent)
+
+                        if !canDeleteStudent {
+                            Text("Add another student before deleting the only profile.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
             .navigationTitle(original == nil ? "Add student" : "Edit profile")
@@ -109,6 +133,21 @@ struct ProfileEditor: View {
                     }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+            }
+            .confirmationDialog(
+                "Delete \(original?.name ?? "student")?",
+                isPresented: $confirmingDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Student", role: .destructive) {
+                    if let original {
+                        onDelete(original)
+                        dismiss()
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This permanently deletes the student's profile, plans, progress, activity, grades, and handwritten work from this iPad.")
             }
         }
     }

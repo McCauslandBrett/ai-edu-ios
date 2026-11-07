@@ -2,8 +2,10 @@ import SwiftUI
 
 struct LearningHubView: View {
     @EnvironmentObject private var profiles: StudentProfileStore
+    @EnvironmentObject private var documents: AssignmentDocumentStore
     @State private var showingAddStudent = false
     @State private var editingProfile: StudentProfile?
+    private let gradeStore = AssignmentGradeStore()
 
     private var student: StudentProfile { profiles.selectedStudent }
 
@@ -48,8 +50,21 @@ struct LearningHubView: View {
             ProfileEditor(profile: nil) { profiles.save($0) }
         }
         .sheet(item: $editingProfile) { profile in
-            ProfileEditor(profile: profile) { profiles.save($0) }
+            ProfileEditor(
+                profile: profile,
+                canDeleteStudent: profiles.students.count > 1,
+                onDelete: deleteStudent
+            ) { profiles.save($0) }
         }
+    }
+
+    private func deleteStudent(_ profile: StudentProfile) {
+        let ownedAssignments = profiles.assignments(for: profile).filter { $0.studentID == profile.id }
+        for assignment in ownedAssignments {
+            gradeStore.delete(assignmentID: assignment.id)
+            documents.deleteWork(for: assignment.id)
+        }
+        profiles.deleteStudent(studentID: profile.id)
     }
 
     @ToolbarContentBuilder

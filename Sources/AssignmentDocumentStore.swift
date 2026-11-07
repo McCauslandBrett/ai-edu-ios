@@ -41,6 +41,14 @@ final class AssignmentDocumentStore: ObservableObject {
         savingAssignments.contains(assignmentID) ? "Saving…" : "Saved on this iPad"
     }
 
+    func deleteWork(for assignmentID: String) {
+        pendingSaves[assignmentID]?.cancel()
+        pendingSaves.removeValue(forKey: assignmentID)
+        drawings.removeValue(forKey: assignmentID)
+        savingAssignments.remove(assignmentID)
+        try? FileManager.default.removeItem(at: fileURL(for: assignmentID))
+    }
+
     private var documentsDirectory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("AssignmentWork", isDirectory: true)

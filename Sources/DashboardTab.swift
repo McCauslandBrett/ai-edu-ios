@@ -48,7 +48,7 @@ struct DashboardTab: View {
                         }
                         .accessibilityLabel("Edit student profile")
                     }
-                    if !student.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if hasRealSummary {
                         Text(student.summary)
                             .font(.body).foregroundStyle(.white.opacity(0.9))
                             .padding(.top, 5)
@@ -105,9 +105,21 @@ struct DashboardTab: View {
 
     private var studentDetails: String {
         var details = ["Age \(student.age.map(String.init) ?? "not set")"]
-        if !student.gradeLevel.isEmpty { details.append(student.gradeLevel) }
-        details.append(student.subjects.isEmpty ? "No subjects yet" : student.subjects.joined(separator: ", "))
+        let isUneditedStarterProfile = student.summary == "Keep building confidence with steady practice." &&
+            student.gradeLevel == "Grade 3"
+        if isUneditedStarterProfile {
+            details.append("Grade not set")
+        } else if !student.gradeLevel.isEmpty {
+            details.append(student.gradeLevel)
+        }
+        let subjects = profiles.subjects(for: student)
+        details.append(subjects.isEmpty ? "No subjects yet" : subjects.joined(separator: ", "))
         return details.joined(separator: " · ")
+    }
+
+    private var hasRealSummary: Bool {
+        let summary = student.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !summary.isEmpty && summary != "Keep building confidence with steady practice."
     }
 }
 

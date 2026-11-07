@@ -6,10 +6,21 @@ struct SubjectsTab: View {
     @State private var subjectPendingDeletion: String?
     let student: StudentProfile
 
+    private var subjects: [String] {
+        profiles.subjects(for: student)
+    }
+
     var body: some View {
         List {
             Section {
-                ForEach(student.subjects, id: \.self) { subject in
+                if subjects.isEmpty {
+                    ContentUnavailableView(
+                        "No subjects yet",
+                        systemImage: "books.vertical",
+                        description: Text("Add a subject to generate this student's first learning plan.")
+                    )
+                }
+                ForEach(subjects, id: \.self) { subject in
                     SubjectListRow(
                         student: student,
                         subject: subject,

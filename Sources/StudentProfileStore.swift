@@ -88,8 +88,34 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    @discardableResult
+    func deleteStudent(studentID: String) -> Bool {
+        guard students.count > 1, students.contains(where: { $0.id == studentID }) else {
+            return false
+        }
+        students.removeAll { $0.id == studentID }
+        subjectPlans = subjectPlans.filter { $0.value.studentID != studentID }
+        retryAssignments.removeAll { $0.studentID == studentID }
+        activityEvents.removeAll { $0.studentID == studentID }
+        if selectedStudentID == studentID, let nextStudent = students.first {
+            selectedStudentID = nextStudent.id
+        }
+        persist()
+        return true
+    }
+
     func subjectPlan(for studentID: String, subject: String) -> StudentSubjectPlan? {
         subjectPlans[StudentSubjectPlan.key(studentID: studentID, subject: subject)]
+    }
+
+    func subjects(for student: StudentProfile) -> [String] {
+        if StudentProfile.examples.contains(where: { $0.id == student.id }) {
+            return student.subjects
+        }
+        return subjectPlans.values
+            .filter { $0.studentID == student.id }
+            .map(\.subject)
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     func assignments(for student: StudentProfile, subject: String? = nil) -> [Assignment] {
@@ -101,7 +127,8 @@ final class StudentProfileStore: ObservableObject {
             }
             return subject.localizedCaseInsensitiveContains(candidate) || candidate.localizedCaseInsensitiveContains(subject)
         }
-        let samples = Assignment.samples.filter { matches($0.subject) }
+        let isExampleStudent = StudentProfile.examples.contains(where: { $0.id == student.id })
+        let samples = isExampleStudent ? Assignment.samples.filter { matches($0.subject) } : []
         let generated = subjectPlans.values
             .filter { saved in
                 saved.studentID == student.id && (subject.map { saved.subject.caseInsensitiveCompare($0) == .orderedSame } ?? true)

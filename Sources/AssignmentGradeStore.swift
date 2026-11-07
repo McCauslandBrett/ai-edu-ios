@@ -18,6 +18,10 @@ struct AssignmentGradeStore {
         defaults.set(data, forKey: key(for: assignmentID))
     }
 
+    func delete(assignmentID: String) {
+        defaults.removeObject(forKey: key(for: assignmentID))
+    }
+
     private func key(for assignmentID: String) -> String {
         "assignment-grade-\(assignmentID)"
     }
