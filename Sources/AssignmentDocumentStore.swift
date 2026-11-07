@@ -21,6 +21,10 @@ final class AssignmentDocumentStore: ObservableObject {
     func updateDrawing(_ drawing: PKDrawing, for assignmentID: String) {
         drawings[assignmentID] = drawing
         savingAssignments.insert(assignmentID)
+        scheduleSave(drawing, for: assignmentID)
+    }
+
+    private func scheduleSave(_ drawing: PKDrawing, for assignmentID: String) {
         pendingSaves[assignmentID]?.cancel()
 
         let work = DispatchWorkItem { [weak self] in
@@ -46,7 +50,7 @@ final class AssignmentDocumentStore: ObservableObject {
         pendingSaves.removeValue(forKey: assignmentID)
         drawings.removeValue(forKey: assignmentID)
         savingAssignments.remove(assignmentID)
-        try? FileManager.default.removeItem(at: fileURL(for: assignmentID))
+        removeSavedDrawing(for: assignmentID)
     }
 
     private var documentsDirectory: URL {
@@ -80,5 +84,9 @@ final class AssignmentDocumentStore: ObservableObject {
         } catch {
             savingAssignments.insert(assignmentID)
         }
+    }
+
+    private func removeSavedDrawing(for assignmentID: String) {
+        try? FileManager.default.removeItem(at: fileURL(for: assignmentID))
     }
 }

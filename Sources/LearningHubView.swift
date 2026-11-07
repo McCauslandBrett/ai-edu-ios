@@ -59,12 +59,20 @@ struct LearningHubView: View {
     }
 
     private func deleteStudent(_ profile: StudentProfile) {
+        removeStoredWork(for: profile)
+        profiles.deleteStudent(studentID: profile.id)
+    }
+
+    private func removeStoredWork(for profile: StudentProfile) {
         let ownedAssignments = profiles.assignments(for: profile).filter { $0.studentID == profile.id }
         for assignment in ownedAssignments {
-            gradeStore.delete(assignmentID: assignment.id)
-            documents.deleteWork(for: assignment.id)
+            removeStoredWork(for: assignment)
         }
-        profiles.deleteStudent(studentID: profile.id)
+    }
+
+    private func removeStoredWork(for assignment: Assignment) {
+        gradeStore.delete(assignmentID: assignment.id)
+        documents.deleteWork(for: assignment.id)
     }
 
     @ToolbarContentBuilder

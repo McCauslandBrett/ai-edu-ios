@@ -72,92 +72,106 @@ struct AssignmentWorkspaceView: View {
 
     private var gradingPanel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("AI grader").font(.headline)
-                    Text("Checks the handwriting against this assignment's answer key and rubric.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    Task { await gradeAssignment() }
-                } label: {
-                    if isGrading {
-                        ProgressView().tint(.white)
-                    } else {
-                        Label(grade == nil ? "Grade work" : "Grade again", systemImage: "sparkles")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isGrading)
-            }
+            gradingHeader
             if let gradingError {
                 Text(gradingError).font(.subheadline).foregroundStyle(.red)
             }
             if let grade {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Suggested score").font(.headline)
-                        Spacer()
-                        Text("\(grade.score.formatted()) / \(grade.total.formatted())")
-                            .font(.title3.bold()).foregroundStyle(.indigo)
-                    }
-                    Text(grade.overallFeedback).font(.body)
-                    if assignment.isHomework {
-                        HStack(spacing: 8) {
-                            Image(systemName: grade.isPassing ? "checkmark.seal.fill" : "xmark.seal.fill")
-                            Text(grade.isPassing ? "PASSED" : "NOT PASSED")
-                                .font(.headline.weight(.bold))
-                            Text("· (grade.correctCount)/(grade.questionCount) correct · 80% required")
-                                .font(.subheadline)
-                        }
-                        .foregroundStyle(grade.isPassing ? .green : .red)
-                        if !grade.isPassing {
-                            Button {
-                                Task { await generateRetryAttempt() }
-                            } label: {
-                                if isGeneratingRetry {
-                                    ProgressView("Creating a new attempt…")
-                                } else {
-                                    Label("Generate new attempt", systemImage: "arrow.clockwise")
-                                }
-                            }
-                            .disabled(isGeneratingRetry)
-                            if let retryError {
-                                Text(retryError).font(.subheadline).foregroundStyle(.red)
-                            }
-                            if let retryAssignment {
-                                NavigationLink {
-                                    AssignmentWorkspaceView(assignment: retryAssignment)
-                                } label: {
-                                    Label("Open new attempt", systemImage: "doc.text")
-                                }
-                            }
-                        }
-                    }
-                    if grade.needsHumanReview {
-                        Label("Some handwriting needs a human review.", systemImage: "exclamationmark.triangle.fill")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
-                    }
-                    ForEach(grade.items) { item in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.question).font(.subheadline.weight(.semibold))
-                            Text("Read as: \(item.studentAnswer)").font(.subheadline)
-                            Text("Expected: \(item.expectedAnswer)").font(.subheadline).foregroundStyle(.secondary)
-                            Text(item.feedback).font(.caption).foregroundStyle(item.isCorrect ? .green : .orange)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-                .padding(14)
-                .background(.indigo.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                gradeResult(grade)
             }
         }
         .padding(18)
         .background(.background, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary))
+    }
+
+    private var gradingHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AI grader").font(.headline)
+                Text("Checks the handwriting against this assignment's answer key and rubric.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                Task { await gradeAssignment() }
+            } label: {
+                if isGrading {
+                    ProgressView().tint(.white)
+                } else {
+                    Label(grade == nil ? "Grade work" : "Grade again", systemImage: "sparkles")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isGrading)
+        }
+    }
+
+    private func gradeResult(_ grade: AssignmentGrade) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Suggested score").font(.headline)
+                Spacer()
+                Text("\(grade.score.formatted()) / \(grade.total.formatted())")
+                    .font(.title3.bold()).foregroundStyle(.indigo)
+            }
+            Text(grade.overallFeedback).font(.body)
+            homeworkOutcome(for: grade)
+            if grade.needsHumanReview {
+                Label("Some handwriting needs a human review.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
+            }
+            ForEach(grade.items) { item in
+                AssignmentGradeItemRow(item: item)
+            }
+        }
+        .padding(14)
+        .background(.indigo.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    @ViewBuilder
+    private func homeworkOutcome(for grade: AssignmentGrade) -> some View {
+        if assignment.isHomework {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: grade.isPassing ? "checkmark.seal.fill" : "xmark.seal.fill")
+                    Text(grade.isPassing ? "PASSED" : "NOT PASSED")
+                        .font(.headline.weight(.bold))
+                    Text("· \(grade.correctCount)/\(grade.questionCount) correct · 80% required")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(grade.isPassing ? .green : .red)
+
+                if !grade.isPassing {
+                    retryAttemptControls
+                }
+            }
+        }
+    }
+
+    private var retryAttemptControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                Task { await generateRetryAttempt() }
+            } label: {
+                if isGeneratingRetry {
+                    ProgressView("Creating a new attempt…")
+                } else {
+                    Label("Generate new attempt", systemImage: "arrow.clockwise")
+                }
+            }
+            .disabled(isGeneratingRetry)
+            if let retryError {
+                Text(retryError).font(.subheadline).foregroundStyle(.red)
+            }
+            if let retryAssignment {
+                NavigationLink {
+                    AssignmentWorkspaceView(assignment: retryAssignment)
+                } label: {
+                    Label("Open new attempt", systemImage: "doc.text")
+                }
+            }
+        }
     }
 
     @MainActor
@@ -171,63 +185,79 @@ struct AssignmentWorkspaceView: View {
                 student: profiles.selectedStudent,
                 drawing: drawing
             )
-            grade = result
-            gradeStore.save(result, assignmentID: assignment.id)
-            profiles.recordGrade(result, for: assignment, studentID: profiles.selectedStudent.id)
+            saveGrade(result)
         } catch {
             gradingError = error.localizedDescription
         }
     }
 
+    private func saveGrade(_ result: AssignmentGrade) {
+        grade = result
+        gradeStore.save(result, assignmentID: assignment.id)
+        profiles.recordGrade(result, for: assignment, studentID: profiles.selectedStudent.id)
+    }
+
     @MainActor
     private func generateRetryAttempt() async {
+        guard let grade else { return }
         isGeneratingRetry = true
         retryError = nil
         defer { isGeneratingRetry = false }
-        guard let grade else { return }
-
-        var failedSkills: [String] = []
-        let mappedSkills = assignment.questionSkills ?? []
-        for (index, item) in grade.items.enumerated() where !item.isCorrect {
-            if mappedSkills.indices.contains(index) {
-                let skill = mappedSkills[index]
-                if !failedSkills.contains(skill) { failedSkills.append(skill) }
-            }
-        }
-        if failedSkills.isEmpty { failedSkills = [assignment.subject] }
-
-        let feedback = grade.items.filter { !$0.isCorrect }
-            .map { "Question: \($0.question). Feedback: \($0.feedback)" }
-            .joined(separator: "\n")
-        let request = AssignmentGenerationRequest(
-            student: AIStudentContext(
-                name: profiles.selectedStudent.name,
-                age: profiles.selectedStudent.age,
-                gradeLevel: profiles.selectedStudent.gradeLevel
-            ),
-            subject: assignment.subject,
-            topic: assignment.title,
-            objective: "Create a fresh new attempt. Focus on these skills: \(failedSkills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(assignment.prompt). Grading feedback to address: \(feedback)",
-            count: 1,
-            pointsPerAssignment: assignment.points,
-            targetedSkills: failedSkills
-        )
 
         do {
+            let request = makeRetryRequest(for: grade)
             guard let generated = try await AssignmentGenerationService().generate(request).first else {
                 throw LearningAIServiceError.service("The service did not return a new assignment attempt.")
             }
-            let attempt = generated.makeAssignment(
-                dueDate: "New attempt",
-                studentID: profiles.selectedStudent.id,
-                parentAssignmentID: assignment.id,
-                titlePrefix: "Retry · "
-            )
-            profiles.addRetryAssignment(attempt)
-            retryAssignment = attempt
+            saveRetryAttempt(generated)
         } catch {
             retryError = error.localizedDescription
         }
+    }
+
+    private func makeRetryRequest(for grade: AssignmentGrade) -> AssignmentGenerationRequest {
+        let student = profiles.selectedStudent
+        let skills = failedSkills(in: grade)
+        let feedback = retryFeedback(in: grade)
+        return AssignmentGenerationRequest(
+            student: AIStudentContext(name: student.name, age: student.age, gradeLevel: student.gradeLevel),
+            subject: assignment.subject,
+            topic: assignment.title,
+            objective: "Create a fresh new attempt. Focus on these skills: \(skills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(assignment.prompt). Grading feedback to address: \(feedback)",
+            count: 1,
+            pointsPerAssignment: assignment.points,
+            targetedSkills: skills
+        )
+    }
+
+    private func failedSkills(in grade: AssignmentGrade) -> [String] {
+        var skills: [String] = []
+        let mappedSkills = assignment.questionSkills ?? []
+        for (index, item) in grade.items.enumerated() where !item.isCorrect {
+            guard mappedSkills.indices.contains(index) else { continue }
+            let skill = mappedSkills[index]
+            if !skills.contains(skill) { skills.append(skill) }
+        }
+        return skills.isEmpty ? [assignment.subject] : skills
+    }
+
+    private func retryFeedback(in grade: AssignmentGrade) -> String {
+        grade.items
+            .filter { !$0.isCorrect }
+            .map { "Question: \($0.question). Feedback: \($0.feedback)" }
+            .joined(separator: "\n")
+    }
+
+    private func saveRetryAttempt(_ generated: GeneratedAssignment) {
+        let studentID = profiles.selectedStudent.id
+        let attempt = generated.makeAssignment(
+            dueDate: "New attempt",
+            studentID: studentID,
+            parentAssignmentID: assignment.id,
+            titlePrefix: "Retry · "
+        )
+        profiles.addRetryAssignment(attempt)
+        retryAssignment = attempt
     }
 
     private var assignmentHeader: some View {
@@ -300,5 +330,22 @@ struct AssignmentWorkspaceView: View {
                 .background(Color.clear)
                 .padding(.top, 12)
         }
+    }
+}
+
+
+private struct AssignmentGradeItemRow: View {
+    let item: AssignmentGrade.Item
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(item.question).font(.subheadline.weight(.semibold))
+            Text("Read as: \(item.studentAnswer)").font(.subheadline)
+            Text("Expected: \(item.expectedAnswer)").font(.subheadline).foregroundStyle(.secondary)
+            Text(item.feedback).font(.caption).foregroundStyle(item.isCorrect ? .green : .orange)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.background, in: RoundedRectangle(cornerRadius: 12))
     }
 }

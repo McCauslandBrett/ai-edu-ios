@@ -9,50 +9,43 @@ struct StudentProfilePersistence {
     }
 
     func loadStudents() -> [StudentProfile] {
-        guard let data = defaults.data(forKey: Key.students),
-              let decoded = try? JSONDecoder().decode([StudentProfile].self, from: data),
-              !decoded.isEmpty else {
+        guard let decoded = decode([StudentProfile].self, for: Key.students), !decoded.isEmpty else {
             return StudentProfile.examples
         }
-        var saved = decoded
-        var removedStarterDefaults = false
-        for index in saved.indices where
-            saved[index].gradeLevel == "Grade 3" &&
-            saved[index].subjects == ["Reading", "Mathematics"] &&
-            saved[index].summary == "Keep building confidence with steady practice." {
-            saved[index].gradeLevel = "Not set"
-            saved[index].subjects = []
-            saved[index].summary = ""
-            removedStarterDefaults = true
+        return migrateStarterProfiles(in: decoded)
+    }
+
+    private func migrateStarterProfiles(in profiles: [StudentProfile]) -> [StudentProfile] {
+        var migrated = profiles
+        var didChange = false
+        for index in migrated.indices where isUneditedStarterProfile(migrated[index]) {
+            migrated[index].gradeLevel = "Not set"
+            migrated[index].subjects = []
+            migrated[index].summary = ""
+            didChange = true
         }
-        if removedStarterDefaults, let migrated = try? JSONEncoder().encode(saved) {
-            defaults.set(migrated, forKey: Key.students)
+        if didChange {
+            saveEncoded(migrated, for: Key.students)
         }
-        return saved
+        return migrated
+    }
+
+    private func isUneditedStarterProfile(_ profile: StudentProfile) -> Bool {
+        profile.gradeLevel == "Grade 3" &&
+            profile.subjects == ["Reading", "Mathematics"] &&
+            profile.summary == "Keep building confidence with steady practice."
     }
 
     func loadSubjectPlans() -> [String: StudentSubjectPlan] {
-        guard let data = defaults.data(forKey: Key.subjectPlans),
-              let saved = try? JSONDecoder().decode([String: StudentSubjectPlan].self, from: data) else {
-            return [:]
-        }
-        return saved
+        decode([String: StudentSubjectPlan].self, for: Key.subjectPlans) ?? [:]
     }
 
     func loadRetryAssignments() -> [Assignment] {
-        guard let data = defaults.data(forKey: Key.retryAssignments),
-              let saved = try? JSONDecoder().decode([Assignment].self, from: data) else {
-            return []
-        }
-        return saved
+        decode([Assignment].self, for: Key.retryAssignments) ?? []
     }
 
     func loadActivityEvents() -> [StudentActivityEvent] {
-        guard let data = defaults.data(forKey: Key.activityEvents),
-              let saved = try? JSONDecoder().decode([StudentActivityEvent].self, from: data) else {
-            return []
-        }
-        return saved
+        decode([StudentActivityEvent].self, for: Key.activityEvents) ?? []
     }
 
     func loadSelectedStudentID(fallback: String) -> String {
@@ -65,18 +58,20 @@ struct StudentProfilePersistence {
         retryAssignments: [Assignment],
         activityEvents: [StudentActivityEvent]
     ) {
-        if let data = try? JSONEncoder().encode(students) {
-            defaults.set(data, forKey: Key.students)
-        }
-        if let data = try? JSONEncoder().encode(subjectPlans) {
-            defaults.set(data, forKey: Key.subjectPlans)
-        }
-        if let data = try? JSONEncoder().encode(retryAssignments) {
-            defaults.set(data, forKey: Key.retryAssignments)
-        }
-        if let data = try? JSONEncoder().encode(activityEvents) {
-            defaults.set(data, forKey: Key.activityEvents)
-        }
+        saveEncoded(students, for: Key.students)
+        saveEncoded(subjectPlans, for: Key.subjectPlans)
+        saveEncoded(retryAssignments, for: Key.retryAssignments)
+        saveEncoded(activityEvents, for: Key.activityEvents)
+    }
+
+    private func decode<Value: Decodable>(_ type: Value.Type, for key: String) -> Value? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
+    private func saveEncoded<Value: Encodable>(_ value: Value, for key: String) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        defaults.set(data, forKey: key)
     }
 
     func saveSelectedStudentID(_ id: String) {

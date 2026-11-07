@@ -30,70 +30,9 @@ struct DashboardTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("STUDENT OVERVIEW")
-                        .font(.caption.weight(.bold)).tracking(1.1)
-                        .foregroundStyle(.white.opacity(0.72))
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(student.name).font(.largeTitle.bold())
-                            Text(studentDetails)
-                                .font(.subheadline).foregroundStyle(.white.opacity(0.78))
-                        }
-                        Spacer()
-                        Button(action: editProfile) {
-                            Image(systemName: "square.and.pencil")
-                                .font(.headline).foregroundStyle(.white)
-                                .padding(10).background(.white.opacity(0.15), in: Circle())
-                        }
-                        .accessibilityLabel("Edit student profile")
-                    }
-                    if hasRealSummary {
-                        Text(student.summary)
-                            .font(.body).foregroundStyle(.white.opacity(0.9))
-                            .padding(.top, 5)
-                    }
-                }
-                .padding(22)
-                .foregroundStyle(.white)
-                .background(LinearGradient(colors: [.indigo, Color(red: 0.12, green: 0.16, blue: 0.38)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 24))
-
-                HStack {
-                    Text("Subject progress").font(.title2.bold())
-                    Spacer()
-                    if let plan = savedPlans.first?.plan {
-                        Text(plan.monthlyWindow).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                    }
-                }
-                if progress.isEmpty {
-                    ContentUnavailableView(
-                        "No skill progress yet",
-                        systemImage: "chart.bar",
-                        description: Text("Add a subject and generate a learning plan to track real progress here.")
-                    )
-                    .frame(minHeight: 150)
-                } else {
-                    ForEach(progress) { item in ProgressRow(progress: item) }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Next milestone", systemImage: "sparkles")
-                        .font(.headline).foregroundStyle(.indigo)
-                    if let nextMilestone {
-                        Text(nextMilestone.milestone.title).font(.title3.bold())
-                        Text("\(nextMilestone.subject) · \(nextMilestone.milestone.date)")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    } else {
-                        Text("No milestones yet").font(.title3.bold())
-                        Text("Milestones will appear after a subject plan is created.")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background, in: RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary))
-
+                studentOverview
+                progressSection
+                nextMilestoneSection
                 DashboardActivitySection(events: profiles.activity(for: student.id))
             }
             .padding(20)
@@ -101,6 +40,85 @@ struct DashboardTab: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color(uiColor: .systemGroupedBackground))
+    }
+
+    private var studentOverview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("STUDENT OVERVIEW")
+                .font(.caption.weight(.bold)).tracking(1.1)
+                .foregroundStyle(.white.opacity(0.72))
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(student.name).font(.largeTitle.bold())
+                    Text(studentDetails)
+                        .font(.subheadline).foregroundStyle(.white.opacity(0.78))
+                }
+                Spacer()
+                Button(action: editProfile) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.headline).foregroundStyle(.white)
+                        .padding(10).background(.white.opacity(0.15), in: Circle())
+                }
+                .accessibilityLabel("Edit student profile")
+            }
+            if hasRealSummary {
+                Text(student.summary)
+                    .font(.body).foregroundStyle(.white.opacity(0.9))
+                    .padding(.top, 5)
+            }
+        }
+        .padding(22)
+        .foregroundStyle(.white)
+        .background(
+            LinearGradient(
+                colors: [.indigo, Color(red: 0.12, green: 0.16, blue: 0.38)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24)
+        )
+    }
+
+    private var progressSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Subject progress").font(.title2.bold())
+                Spacer()
+                if let plan = savedPlans.first?.plan {
+                    Text(plan.monthlyWindow).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                }
+            }
+            if progress.isEmpty {
+                ContentUnavailableView(
+                    "No skill progress yet",
+                    systemImage: "chart.bar",
+                    description: Text("Add a subject and generate a learning plan to track real progress here.")
+                )
+                .frame(minHeight: 150)
+            } else {
+                ForEach(progress) { item in ProgressRow(progress: item) }
+            }
+        }
+    }
+
+    private var nextMilestoneSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Next milestone", systemImage: "sparkles")
+                .font(.headline).foregroundStyle(.indigo)
+            if let nextMilestone {
+                Text(nextMilestone.milestone.title).font(.title3.bold())
+                Text("\(nextMilestone.subject) · \(nextMilestone.milestone.date)")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                Text("No milestones yet").font(.title3.bold())
+                Text("Milestones will appear after a subject plan is created.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary))
     }
 
     private var studentDetails: String {
@@ -137,52 +155,68 @@ private struct DashboardActivitySection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Recent activity").font(.title2.bold())
-                    Text("Assignment submissions and assessments")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "calendar.badge.clock")
-                    .font(.title2).foregroundStyle(.indigo)
-            }
-
-            HStack(spacing: 12) {
-                ActivityCountCard(title: "Assignments this week", count: thisWeek.filter { $0.kind == .assignment }.count)
-                ActivityCountCard(title: "Assessments this week", count: thisWeek.filter { $0.kind == .assessment }.count)
-            }
-
-            if events.isEmpty {
-                ContentUnavailableView(
-                    "No activity recorded yet",
-                    systemImage: "checklist",
-                    description: Text("Grading completed work records its submission date here.")
-                )
-                .frame(minHeight: 140)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(visibleEvents) { event in
-                        ActivityEventRow(event: event)
-                        if event.id != visibleEvents.last?.id {
-                            Divider().padding(.leading, 50)
-                        }
-                    }
-                }
-
-                if events.count > 8 {
-                    Button(showsAllActivity ? "Show less" : "Show all \(events.count) records") {
-                        showsAllActivity.toggle()
-                    }
-                    .font(.subheadline.weight(.semibold))
-                }
-            }
+            activityHeader
+            weeklyCounts
+            activityList
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary))
     }
+
+    private var activityHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Recent activity").font(.title2.bold())
+                Text("Assignment submissions and assessments")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "calendar.badge.clock")
+                .font(.title2).foregroundStyle(.indigo)
+        }
+    }
+
+    private var weeklyCounts: some View {
+        HStack(spacing: 12) {
+            ActivityCountCard(title: "Assignments this week", count: thisWeek.filter { $0.kind == .assignment }.count)
+            ActivityCountCard(title: "Assessments this week", count: thisWeek.filter { $0.kind == .assessment }.count)
+        }
+    }
+
+    @ViewBuilder
+    private var activityList: some View {
+        if events.isEmpty {
+            ContentUnavailableView(
+                "No activity recorded yet",
+                systemImage: "checklist",
+                description: Text("Grading completed work records its submission date here.")
+            )
+            .frame(minHeight: 140)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(visibleEvents) { event in
+                    ActivityEventRow(event: event)
+                    if event.id != visibleEvents.last?.id {
+                        Divider().padding(.leading, 50)
+                    }
+                }
+            }
+            showAllActivityButton
+        }
+    }
+
+    @ViewBuilder
+    private var showAllActivityButton: some View {
+        if events.count > 8 {
+            Button(showsAllActivity ? "Show less" : "Show all \(events.count) records") {
+                showsAllActivity.toggle()
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+    }
+
 }
 
 private struct ActivityCountCard: View {

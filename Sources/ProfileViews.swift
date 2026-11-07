@@ -88,67 +88,107 @@ struct ProfileEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Student") {
-                    TextField("Name", text: $name)
-                    TextField("Age", text: $age).keyboardType(.numberPad)
-                    TextField("School grade level", text: $grade)
-                }
-                Section("Learning summary") {
-                    TextEditor(text: $summary).frame(minHeight: 120)
-                }
-                if let original {
-                    Section("Delete student") {
-                        Button("Delete \(original.name)", role: .destructive) {
-                            confirmingDelete = true
-                        }
-                        .disabled(!canDeleteStudent)
-
-                        if !canDeleteStudent {
-                            Text("Add another student before deleting the only profile.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                studentSection
+                learningSummarySection
+                deleteStudentSection
             }
             .navigationTitle(original == nil ? "Add student" : "Edit profile")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !cleaned.isEmpty else { return }
-                        let value = StudentProfile(
-                            id: original?.id ?? UUID().uuidString,
-                            name: cleaned,
-                            age: Int(age),
-                            gradeLevel: grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? "Not set"
-                                : grade.trimmingCharacters(in: .whitespacesAndNewlines),
-                            subjects: original?.subjects ?? [],
-                            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines)
-                        )
-                        onSave(value)
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
+            .toolbar { editorToolbar }
             .confirmationDialog(
                 "Delete \(original?.name ?? "student")?",
                 isPresented: $confirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("Delete Student", role: .destructive) {
-                    if let original {
-                        onDelete(original)
-                        dismiss()
-                    }
-                }
-                Button("Cancel", role: .cancel) { }
+                deleteConfirmationActions
             } message: {
-                Text("This permanently deletes the student's profile, plans, progress, activity, grades, and handwritten work from this iPad.")
+                deleteConfirmationMessage
             }
         }
+    }
+
+    private var studentSection: some View {
+        Section("Student") {
+            TextField("Name", text: $name)
+            TextField("Age", text: $age).keyboardType(.numberPad)
+            TextField("School grade level", text: $grade)
+        }
+    }
+
+    private var learningSummarySection: some View {
+        Section("Learning summary") {
+            TextEditor(text: $summary).frame(minHeight: 120)
+        }
+    }
+
+    @ViewBuilder
+    private var deleteStudentSection: some View {
+        if let original {
+            Section("Delete student") {
+                Button("Delete \(original.name)", role: .destructive) {
+                    confirmingDelete = true
+                }
+                .disabled(!canDeleteStudent)
+
+                if !canDeleteStudent {
+                    Text("Add another student before deleting the only profile.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var editorToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Save", action: saveProfile)
+                .disabled(cleanedName.isEmpty)
+        }
+    }
+
+    @ViewBuilder
+    private var deleteConfirmationActions: some View {
+        Button("Delete Student", role: .destructive, action: deleteOriginalStudent)
+        Button("Cancel", role: .cancel) { }
+    }
+
+    private var deleteConfirmationMessage: some View {
+        Text("This permanently deletes the student's profile, plans, progress, activity, grades, and handwritten work from this iPad.")
+    }
+
+    private var cleanedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var cleanedGradeLevel: String {
+        let value = grade.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? "Not set" : value
+    }
+
+    private func saveProfile() {
+        guard let profile = makeProfile() else { return }
+        onSave(profile)
+        dismiss()
+    }
+
+    private func makeProfile() -> StudentProfile? {
+        guard !cleanedName.isEmpty else { return nil }
+        return StudentProfile(
+            id: original?.id ?? UUID().uuidString,
+            name: cleanedName,
+            age: Int(age),
+            gradeLevel: cleanedGradeLevel,
+            subjects: original?.subjects ?? [],
+            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+
+    private func deleteOriginalStudent() {
+        guard let original else { return }
+        onDelete(original)
+        dismiss()
     }
 }
