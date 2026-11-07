@@ -3,6 +3,7 @@ import SwiftUI
 struct SubjectsTab: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     @State private var showingSubjectForm = false
+    @State private var subjectFormCloseRequested = false
     @State private var subjectPendingDeletion: String?
     let student: StudentProfile
 
@@ -52,7 +53,10 @@ struct SubjectsTab: View {
             Text("This removes the subject and its generated learning plan from this student's profile. Saved handwritten assignment work is kept.")
         }
         .safeAreaInset(edge: .bottom) {
-            Button { showingSubjectForm = true } label: {
+            Button {
+                subjectFormCloseRequested = false
+                showingSubjectForm = true
+            } label: {
                 Label("Add subject and generate plan", systemImage: "sparkles")
                     .font(.headline)
                     .frame(maxWidth: 600)
@@ -62,11 +66,33 @@ struct SubjectsTab: View {
             }
             .padding()
         }
-        .sheet(isPresented: $showingSubjectForm) {
-            SubjectPlanCreationView(student: student) { newPlan in
-                profiles.saveSubjectPlan(newPlan)
-            }
+        .fullScreenCover(isPresented: subjectFormPresentation) {
+            SubjectPlanCreationView(
+                student: student,
+                onCreate: { profiles.saveSubjectPlan($0) },
+                onClose: closeSubjectForm
+            )
+            .interactiveDismissDisabled()
         }
+    }
+
+    private var subjectFormPresentation: Binding<Bool> {
+        Binding(
+            get: { showingSubjectForm },
+            set: { isPresented in
+                if isPresented {
+                    showingSubjectForm = true
+                } else if subjectFormCloseRequested {
+                    showingSubjectForm = false
+                    subjectFormCloseRequested = false
+                }
+            }
+        )
+    }
+
+    private func closeSubjectForm() {
+        subjectFormCloseRequested = true
+        showingSubjectForm = false
     }
 
     private var deletionConfirmationPresented: Binding<Bool> {

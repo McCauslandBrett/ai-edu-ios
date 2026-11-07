@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct SubjectPlanCreationView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let onCreate: (StudentSubjectPlan) -> Void
+    let onClose: () -> Void
 
     @State private var subject = ""
     @State private var targetedSkills = ""
@@ -101,7 +101,7 @@ struct SubjectPlanCreationView: View {
     @ToolbarContentBuilder
     private var formToolbar: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }.disabled(isGenerating)
+            Button("Cancel", action: onClose).disabled(isGenerating)
         }
         ToolbarItem(placement: .confirmationAction) {
             Button {
@@ -141,7 +141,7 @@ struct SubjectPlanCreationView: View {
                 inputs: submission.inputs,
                 plan: plan
             ))
-            dismiss()
+            onClose()
         } catch {
             errorMessage = error.localizedDescription
         }
