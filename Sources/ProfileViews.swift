@@ -70,7 +70,7 @@ struct ProfileEditor: View {
         self.onSave = onSave
         _name = State(initialValue: profile?.name ?? "")
         _age = State(initialValue: profile?.age.map(String.init) ?? "")
-        _grade = State(initialValue: profile?.gradeLevel ?? "Grade 3")
+        _grade = State(initialValue: profile?.gradeLevel ?? "")
         _summary = State(initialValue: profile?.summary ?? "")
     }
 
@@ -98,9 +98,11 @@ struct ProfileEditor: View {
                             id: original?.id ?? UUID().uuidString,
                             name: cleaned,
                             age: Int(age),
-                            gradeLevel: grade.isEmpty ? "Grade 3" : grade,
-                            subjects: original?.subjects ?? ["Reading", "Mathematics"],
-                            summary: summary.isEmpty ? "Keep building confidence with steady practice." : summary
+                            gradeLevel: grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? "Not set"
+                                : grade.trimmingCharacters(in: .whitespacesAndNewlines),
+                            subjects: original?.subjects ?? [],
+                            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines)
                         )
                         onSave(value)
                         dismiss()

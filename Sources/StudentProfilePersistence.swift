@@ -10,9 +10,23 @@ struct StudentProfilePersistence {
 
     func loadStudents() -> [StudentProfile] {
         guard let data = defaults.data(forKey: Key.students),
-              let saved = try? JSONDecoder().decode([StudentProfile].self, from: data),
-              !saved.isEmpty else {
+              let decoded = try? JSONDecoder().decode([StudentProfile].self, from: data),
+              !decoded.isEmpty else {
             return StudentProfile.examples
+        }
+        var saved = decoded
+        var removedStarterDefaults = false
+        for index in saved.indices where
+            saved[index].gradeLevel == "Grade 3" &&
+            saved[index].subjects == ["Reading", "Mathematics"] &&
+            saved[index].summary == "Keep building confidence with steady practice." {
+            saved[index].gradeLevel = "Not set"
+            saved[index].subjects = []
+            saved[index].summary = ""
+            removedStarterDefaults = true
+        }
+        if removedStarterDefaults, let migrated = try? JSONEncoder().encode(saved) {
+            defaults.set(migrated, forKey: Key.students)
         }
         return saved
     }

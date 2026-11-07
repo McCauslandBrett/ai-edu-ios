@@ -4,9 +4,27 @@ struct DashboardTab: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let editProfile: () -> Void
-    private var plan: StudentLearningPlan { StudentLearningPlanTemplates.forStudent(student.id, subject: student.subjects.first ?? "Mathematics") }
+    private var savedPlans: [StudentSubjectPlan] {
+        profiles.subjectPlans.values
+            .filter { $0.studentID == student.id }
+            .sorted { $0.subject.localizedCaseInsensitiveCompare($1.subject) == .orderedAscending }
+    }
     private var progress: [SubjectProgress] {
-        student.subjects.flatMap { StudentLearningPlanTemplates.forStudent(student.id, subject: $0).progress }.prefix(6).map { $0 }
+        savedPlans.flatMap { saved in
+            saved.plan.progress.map { skill in
+                SubjectProgress(
+                    subject: "\(saved.subject) · \(skill.subject)",
+                    completion: Int(skill.completion.rounded()),
+                    nextMilestone: skill.nextMilestone,
+                    status: skill.status
+                )
+            }
+        }.prefix(6).map { $0 }
+    }
+    private var nextMilestone: (subject: String, milestone: GeneratedLearningPlan.Milestone)? {
+        savedPlans.compactMap { saved in
+            saved.plan.milestones.first.map { (saved.subject, $0) }
+        }.first
     }
 
     var body: some View {
@@ -19,7 +37,7 @@ struct DashboardTab: View {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(student.name).font(.largeTitle.bold())
-                            Text("Age \(student.age.map(String.init) ?? "not set") · \(student.gradeLevel) · " + student.subjects.joined(separator: ", "))
+                            Text(studentDetails)
                                 .font(.subheadline).foregroundStyle(.white.opacity(0.78))
                         }
                         Spacer()
@@ -30,9 +48,11 @@ struct DashboardTab: View {
                         }
                         .accessibilityLabel("Edit student profile")
                     }
-                    Text(student.summary)
-                        .font(.body).foregroundStyle(.white.opacity(0.9))
-                        .padding(.top, 5)
+                    if !student.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(student.summary)
+                            .font(.body).foregroundStyle(.white.opacity(0.9))
+                            .padding(.top, 5)
+                    }
                 }
                 .padding(22)
                 .foregroundStyle(.white)
@@ -41,17 +61,33 @@ struct DashboardTab: View {
                 HStack {
                     Text("Subject progress").font(.title2.bold())
                     Spacer()
-                    Text(plan.month).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                    if let plan = savedPlans.first?.plan {
+                        Text(plan.monthlyWindow).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                    }
                 }
-                ForEach(progress) { item in ProgressRow(progress: item) }
+                if progress.isEmpty {
+                    ContentUnavailableView(
+                        "No skill progress yet",
+                        systemImage: "chart.bar",
+                        description: Text("Add a subject and generate a learning plan to track real progress here.")
+                    )
+                    .frame(minHeight: 150)
+                } else {
+                    ForEach(progress) { item in ProgressRow(progress: item) }
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Next milestone", systemImage: "sparkles")
                         .font(.headline).foregroundStyle(.indigo)
-                    Text(plan.milestones.first?.title ?? "Keep learning")
-                        .font(.title3.bold())
-                    Text(plan.milestones.first?.date ?? "")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    if let nextMilestone {
+                        Text(nextMilestone.milestone.title).font(.title3.bold())
+                        Text("\(nextMilestone.subject) · \(nextMilestone.milestone.date)")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    } else {
+                        Text("No milestones yet").font(.title3.bold())
+                        Text("Milestones will appear after a subject plan is created.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,6 +101,13 @@ struct DashboardTab: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color(uiColor: .systemGroupedBackground))
+    }
+
+    private var studentDetails: String {
+        var details = ["Age \(student.age.map(String.init) ?? "not set")"]
+        if !student.gradeLevel.isEmpty { details.append(student.gradeLevel) }
+        details.append(student.subjects.isEmpty ? "No subjects yet" : student.subjects.joined(separator: ", "))
+        return details.joined(separator: " · ")
     }
 }
 
