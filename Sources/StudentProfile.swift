@@ -32,3 +32,36 @@ struct LearningMilestone: Identifiable, Hashable {
     let date: String
     let kind: String
 }
+
+struct StudentActivityEvent: Identifiable, Codable, Hashable {
+    enum Kind: String, Codable {
+        case assignment
+        case assessment
+    }
+
+    let id: String
+    let studentID: String
+    let kind: Kind
+    let title: String
+    let subject: String
+    let recordedAt: Date
+    let score: Double
+    let total: Double
+    let correctQuestions: Int
+    let questionCount: Int
+    let passed: Bool?
+
+    init(studentID: String, assignment: Assignment, grade: AssignmentGrade, recordedAt: Date = .now) {
+        id = UUID().uuidString
+        self.studentID = studentID
+        kind = assignment.isHomework ? .assignment : .assessment
+        title = assignment.title
+        subject = assignment.subject
+        self.recordedAt = recordedAt
+        score = grade.score
+        total = grade.total
+        correctQuestions = grade.correctCount
+        questionCount = grade.questionCount
+        passed = assignment.isHomework ? grade.isPassing : nil
+    }
+}

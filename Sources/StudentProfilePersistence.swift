@@ -33,11 +33,24 @@ struct StudentProfilePersistence {
         return saved
     }
 
+    func loadActivityEvents() -> [StudentActivityEvent] {
+        guard let data = defaults.data(forKey: Key.activityEvents),
+              let saved = try? JSONDecoder().decode([StudentActivityEvent].self, from: data) else {
+            return []
+        }
+        return saved
+    }
+
     func loadSelectedStudentID(fallback: String) -> String {
         defaults.string(forKey: Key.selectedStudentID) ?? fallback
     }
 
-    func save(students: [StudentProfile], subjectPlans: [String: StudentSubjectPlan], retryAssignments: [Assignment]) {
+    func save(
+        students: [StudentProfile],
+        subjectPlans: [String: StudentSubjectPlan],
+        retryAssignments: [Assignment],
+        activityEvents: [StudentActivityEvent]
+    ) {
         if let data = try? JSONEncoder().encode(students) {
             defaults.set(data, forKey: Key.students)
         }
@@ -46,6 +59,9 @@ struct StudentProfilePersistence {
         }
         if let data = try? JSONEncoder().encode(retryAssignments) {
             defaults.set(data, forKey: Key.retryAssignments)
+        }
+        if let data = try? JSONEncoder().encode(activityEvents) {
+            defaults.set(data, forKey: Key.activityEvents)
         }
     }
 
@@ -57,6 +73,7 @@ struct StudentProfilePersistence {
         static let students = "studentProfiles"
         static let subjectPlans = "studentSubjectPlans"
         static let retryAssignments = "retryAssignments"
+        static let activityEvents = "studentActivityEvents"
         static let selectedStudentID = "selectedStudentID"
     }
 }

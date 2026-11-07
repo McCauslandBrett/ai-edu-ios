@@ -6,6 +6,7 @@ final class StudentProfileStore: ObservableObject {
     @Published private(set) var students: [StudentProfile]
     @Published private(set) var subjectPlans: [String: StudentSubjectPlan]
     @Published private(set) var retryAssignments: [Assignment]
+    @Published private(set) var activityEvents: [StudentActivityEvent]
     @Published var selectedStudentID: String {
         didSet { persistence.saveSelectedStudentID(selectedStudentID) }
     }
@@ -18,6 +19,7 @@ final class StudentProfileStore: ObservableObject {
         self.students = initialStudents
         self.subjectPlans = persistence.loadSubjectPlans()
         self.retryAssignments = persistence.loadRetryAssignments()
+        self.activityEvents = persistence.loadActivityEvents()
         self.selectedStudentID = persistence.loadSelectedStudentID(fallback: initialStudents.first?.id ?? "student-1")
     }
 
@@ -54,21 +56,29 @@ final class StudentProfileStore: ObservableObject {
     }
 
     func recordGrade(_ grade: AssignmentGrade, for assignment: Assignment, studentID: String) {
-        guard let skills = assignment.questionSkills,
-              skills.count == assignment.questions.count,
-              grade.items.count == assignment.questions.count,
-              let key = subjectPlans.keys.first(where: { candidate in
-                  guard let saved = subjectPlans[candidate] else { return false }
-                  return saved.studentID == studentID && saved.subject.caseInsensitiveCompare(assignment.subject) == .orderedSame
-              }),
-              var saved = subjectPlans[key] else { return }
+        activityEvents.append(StudentActivityEvent(studentID: studentID, assignment: assignment, grade: grade))
 
-        var results = saved.competencyResults ?? [:]
-        results[assignment.id] = grade.items.map(\.isCorrect)
-        saved.competencyResults = results
-        updateCompetencyProgress(in: &saved)
-        subjectPlans[key] = saved
+        if let skills = assignment.questionSkills,
+           skills.count == assignment.questions.count,
+           grade.items.count == assignment.questions.count,
+           let key = subjectPlans.keys.first(where: { candidate in
+               guard let saved = subjectPlans[candidate] else { return false }
+               return saved.studentID == studentID && saved.subject.caseInsensitiveCompare(assignment.subject) == .orderedSame
+           }),
+           var saved = subjectPlans[key] {
+            var results = saved.competencyResults ?? [:]
+            results[assignment.id] = grade.items.map(\.isCorrect)
+            saved.competencyResults = results
+            updateCompetencyProgress(in: &saved)
+            subjectPlans[key] = saved
+        }
         persist()
+    }
+
+    func activity(for studentID: String) -> [StudentActivityEvent] {
+        activityEvents
+            .filter { $0.studentID == studentID }
+            .sorted { $0.recordedAt > $1.recordedAt }
     }
 
     func deleteSubject(studentID: String, subject: String) {
@@ -181,7 +191,12 @@ final class StudentProfileStore: ObservableObject {
     }
 
     private func persist() {
-        persistence.save(students: students, subjectPlans: subjectPlans, retryAssignments: retryAssignments)
+        persistence.save(
+            students: students,
+            subjectPlans: subjectPlans,
+            retryAssignments: retryAssignments,
+            activityEvents: activityEvents
+        )
     }
 }
 
