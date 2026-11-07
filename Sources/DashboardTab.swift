@@ -169,7 +169,7 @@ private struct DashboardActivitySection: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Recent activity").font(.title2.bold())
-                Text("Assignment submissions and assessments")
+                Text("Assignments, assessments, and tutor sessions")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
@@ -182,6 +182,7 @@ private struct DashboardActivitySection: View {
         HStack(spacing: 12) {
             ActivityCountCard(title: "Assignments this week", count: thisWeek.filter { $0.kind == .assignment }.count)
             ActivityCountCard(title: "Assessments this week", count: thisWeek.filter { $0.kind == .assessment }.count)
+            ActivityCountCard(title: "Tutor sessions this week", count: thisWeek.filter { $0.kind == .tutorSession }.count)
         }
     }
 
@@ -238,11 +239,17 @@ private struct ActivityEventRow: View {
     let event: StudentActivityEvent
 
     private var headline: String {
-        event.kind == .assessment ? "Assessment taken" : "Assignment submitted"
+        switch event.kind {
+        case .assessment: return "Assessment taken"
+        case .assignment: return "Assignment submitted"
+        case .tutorSession: return "Tutor session completed"
+        }
     }
 
     private var resultText: String {
-        if event.kind == .assessment {
+        if event.kind == .tutorSession {
+            return event.completionNote ?? "Lesson finished"
+        } else if event.kind == .assessment {
             return "\(event.score.formatted()) / \(event.total.formatted()) points · \(event.correctQuestions)/\(event.questionCount) correct"
         }
         let outcome = event.passed == true ? "Passed" : "Needs another attempt"
@@ -250,12 +257,16 @@ private struct ActivityEventRow: View {
     }
 
     private var resultColor: Color {
-        event.kind == .assessment ? .indigo : (event.passed == true ? .green : .orange)
+        switch event.kind {
+        case .assessment: return .indigo
+        case .assignment: return event.passed == true ? .green : .orange
+        case .tutorSession: return .green
+        }
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: event.kind == .assessment ? "checkmark.seal.fill" : "doc.text.fill")
+            Image(systemName: event.kind == .assessment ? "checkmark.seal.fill" : event.kind == .tutorSession ? "bubble.left.and.bubble.right.fill" : "doc.text.fill")
                 .font(.title3).foregroundStyle(resultColor)
                 .frame(width: 38, height: 38)
                 .background(resultColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 11))

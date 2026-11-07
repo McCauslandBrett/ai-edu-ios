@@ -37,6 +37,7 @@ struct StudentActivityEvent: Identifiable, Codable, Hashable {
     enum Kind: String, Codable {
         case assignment
         case assessment
+        case tutorSession
     }
 
     let id: String
@@ -50,6 +51,7 @@ struct StudentActivityEvent: Identifiable, Codable, Hashable {
     let correctQuestions: Int
     let questionCount: Int
     let passed: Bool?
+    let completionNote: String?
 
     init(studentID: String, assignment: Assignment, grade: AssignmentGrade, recordedAt: Date = .now) {
         id = UUID().uuidString
@@ -63,5 +65,28 @@ struct StudentActivityEvent: Identifiable, Codable, Hashable {
         correctQuestions = grade.correctCount
         questionCount = grade.questionCount
         passed = assignment.isHomework ? grade.isPassing : nil
+        completionNote = nil
+    }
+
+    init(
+        studentID: String,
+        subject: String,
+        weekNumber: Int,
+        tutorTurnCount: Int,
+        completionReason: String,
+        recordedAt: Date = .now
+    ) {
+        id = UUID().uuidString
+        self.studentID = studentID
+        kind = .tutorSession
+        title = "Week \(weekNumber) whiteboard tutor"
+        self.subject = subject
+        self.recordedAt = recordedAt
+        score = 0
+        total = 0
+        correctQuestions = 0
+        questionCount = tutorTurnCount
+        passed = nil
+        completionNote = completionReason
     }
 }

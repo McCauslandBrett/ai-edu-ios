@@ -4,6 +4,7 @@ import PencilKit
 
 struct TutorChatView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let subject: String
     let weekNumber: Int
@@ -21,6 +22,12 @@ struct TutorChatView: View {
     @State private var illustrationError: String?
     @State private var showsConversation = false
     @State private var selectedTool: PencilCanvasToolMode = .pen
+    @State private var tutorTurnCount = 0
+    @State private var sessionReadyToComplete = false
+    @State private var completionReason: String?
+    @State private var didCompleteSession = false
+
+    private let maximumTutorTurns = 5
 
     var body: some View {
         GeometryReader { geometry in
@@ -62,7 +69,12 @@ struct TutorChatView: View {
                     .scaledToFit()
                     .frame(width: size.width, height: size.height)
             }
-            PencilCanvas(drawing: $drawing, showsToolPicker: false, toolMode: selectedTool)
+            PencilCanvas(
+                drawing: $drawing,
+                showsToolPicker: false,
+                toolMode: selectedTool,
+                drawingPolicy: .anyInput
+            )
                 .frame(width: size.width, height: size.height)
         }
         .onAppear { canvasSize = size }
@@ -179,45 +191,71 @@ struct TutorChatView: View {
     private var voiceControls: some View {
         VStack(spacing: 8) {
             voiceStatus
-            HStack(spacing: 10) {
-                Button {
-                    toggleRecording()
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: speech.isRecording ? "checkmark" : "mic.fill")
-                            .font(.title2.bold())
-                        Text(speech.isRecording ? "I'm done" : "Tap to talk")
-                            .font(.title3.weight(.bold))
+            if sessionReadyToComplete {
+                Button(action: completeSession) {
+                    Label("Complete session", systemImage: "checkmark.seal.fill")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 380)
+                        .frame(height: 58)
+                        .background(Color.green, in: Capsule())
+                }
+                .disabled(didCompleteSession)
+            } else {
+                HStack(spacing: 10) {
+                    Button {
+                        toggleRecording()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: speech.isRecording ? "checkmark" : "mic.fill")
+                                .font(.title2.bold())
+                            Text(speech.isRecording ? "I'm done" : "Tap to talk")
+                                .font(.title3.weight(.bold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: 360)
+                        .frame(height: 66)
+                        .background(speech.isRecording ? Color.red : Color.indigo, in: Capsule())
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: 360)
-                    .frame(height: 66)
-                    .background(speech.isRecording ? Color.red : Color.indigo, in: Capsule())
-                }
-                .disabled(isSending || speech.isTranscribing || speech.isSpeaking)
-                .accessibilityLabel(speech.isRecording ? "Finish speaking" : "Talk to the tutor")
+                    .disabled(isSending || speech.isTranscribing || speech.isSpeaking)
+                    .accessibilityLabel(speech.isRecording ? "Finish speaking" : "Talk to the tutor")
 
-                Button {
-                    speech.stopSpeaking()
-                    Task { await sendToTutor(action: "next-question") }
-                } label: {
-                    Label("Next question", systemImage: "arrow.right.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .frame(height: 50)
-                        .background(.thinMaterial, in: Capsule())
+                    Menu {
+                        Toggle("Allow online fallback (uses AI credits)", isOn: $speech.allowsOnlineFallback)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .background(.thinMaterial, in: Circle())
+                    }
+                    .accessibilityLabel("Voice transcription options")
                 }
-                .disabled(isSending || speech.isTranscribing || speech.isRecording)
 
-                Menu {
-                    Toggle("Allow online fallback (uses AI credits)", isOn: $speech.allowsOnlineFallback)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title2.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: Circle())
+                HStack(spacing: 12) {
+                    Button {
+                        speech.stopSpeaking()
+                        Task { await sendToTutor(action: "check-whiteboard") }
+                    } label: {
+                        Label("Check my work", systemImage: "paperplane.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .frame(height: 42)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                    .disabled(isSending || speech.isTranscribing || speech.isRecording)
+
+                    Button {
+                        speech.stopSpeaking()
+                        Task { await sendToTutor(action: "next-question") }
+                    } label: {
+                        Label("Next question", systemImage: "arrow.right.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .frame(height: 42)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                    .disabled(isSending || speech.isTranscribing || speech.isRecording)
                 }
-                .accessibilityLabel("Voice transcription options")
             }
         }
         .frame(maxWidth: .infinity)
@@ -227,7 +265,10 @@ struct TutorChatView: View {
 
     @ViewBuilder
     private var voiceStatus: some View {
-        if isSending || speech.isTranscribing {
+        if sessionReadyToComplete {
+            Label("Lesson complete · ready to finish", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+        } else if isSending || speech.isTranscribing {
             HStack(spacing: 8) {
                 ProgressView()
                 Text(isSending ? "Tutor is thinking…" : "Checking Apple Speech, then online if allowed…")
@@ -281,7 +322,7 @@ struct TutorChatView: View {
 
     @MainActor
     private func sendToTutor(action: String? = nil) async {
-        guard !isSending else { return }
+        guard !isSending, !sessionReadyToComplete else { return }
         isSending = true
         errorMessage = nil
         defer { isSending = false }
@@ -292,6 +333,7 @@ struct TutorChatView: View {
             weekNumber: weekNumber,
             lecturePrompt: lecturePrompt,
             action: action,
+            tutorTurnCount: tutorTurnCount,
             messages: messages.suffix(24).map { TutorChatRequest.Message(role: $0.role.rawValue, content: $0.text) },
             canvasItems: canvasItems,
             imageBase64: whiteboardImageBase64()
@@ -299,11 +341,17 @@ struct TutorChatView: View {
 
         do {
             let response = try await TutorChatService().send(request)
+            tutorTurnCount += 1
+            if response.sessionComplete || tutorTurnCount >= maximumTutorTurns {
+                sessionReadyToComplete = true
+                completionReason = response.completionReason ?? "Finished after \(tutorTurnCount) tutor turns."
+            }
             messages.append(TutorChatMessage(role: .assistant, text: response.reply))
             canvasItems.append(contentsOf: response.canvasItems)
             canvasItems = Array(canvasItems.suffix(12))
             speech.speak(response.reply)
-            if let encodedImage = response.imageBase64,
+            if action != "check-whiteboard",
+               let encodedImage = response.imageBase64,
                let data = Data(base64Encoded: encodedImage),
                let newIllustration = UIImage(data: data) {
                 illustration = newIllustration
@@ -314,6 +362,21 @@ struct TutorChatView: View {
             errorMessage = error.localizedDescription
             speech.speak("I couldn't reach your tutor. Please ask a grown-up to help.")
         }
+    }
+
+    @MainActor
+    private func completeSession() {
+        guard sessionReadyToComplete, !didCompleteSession else { return }
+        didCompleteSession = true
+        profiles.recordTutorSession(
+            studentID: student.id,
+            subject: subject,
+            weekNumber: weekNumber,
+            tutorTurnCount: tutorTurnCount,
+            completionReason: completionReason ?? "Tutor session completed."
+        )
+        speech.stopSpeaking()
+        dismiss()
     }
 
     private func whiteboardImageBase64() -> String? {

@@ -23,6 +23,7 @@ struct TutorChatRequest: Encodable {
     let weekNumber: Int
     let lecturePrompt: String
     let action: String?
+    let tutorTurnCount: Int
     let messages: [Message]
     let canvasItems: [String]
     let imageBase64: String?
@@ -33,6 +34,8 @@ struct TutorChatResponse: Decodable {
     let canvasItems: [String]
     let imageBase64: String?
     let imageError: String?
+    let sessionComplete: Bool
+    let completionReason: String?
 }
 
 private struct TutorTranscriptionRequest: Encodable {

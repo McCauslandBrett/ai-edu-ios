@@ -18,6 +18,7 @@ struct PencilCanvas: UIViewRepresentable {
     @Binding var drawing: PKDrawing
     var showsToolPicker = true
     var toolMode: PencilCanvasToolMode?
+    var drawingPolicy: PKCanvasViewDrawingPolicy = .pencilOnly
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -27,7 +28,7 @@ struct PencilCanvas: UIViewRepresentable {
         let canvas = PKCanvasView()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
-        canvas.drawingPolicy = .pencilOnly // Leave finger gestures available for scrolling the assignment page.
+        canvas.drawingPolicy = drawingPolicy
         if let toolMode {
             canvas.tool = toolMode.pencilKitTool
         }

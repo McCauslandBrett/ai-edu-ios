@@ -61,6 +61,23 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    func recordTutorSession(
+        studentID: String,
+        subject: String,
+        weekNumber: Int,
+        tutorTurnCount: Int,
+        completionReason: String
+    ) {
+        activityEvents.append(StudentActivityEvent(
+            studentID: studentID,
+            subject: subject,
+            weekNumber: weekNumber,
+            tutorTurnCount: tutorTurnCount,
+            completionReason: completionReason
+        ))
+        persist()
+    }
+
     private func updateSubjectPlanResults(
         _ grade: AssignmentGrade,
         for assignment: Assignment,
