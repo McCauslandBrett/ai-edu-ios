@@ -22,6 +22,10 @@
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Connect to the AI grading service on your local Wi-Fi network.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Let the student speak to the tutor during a lesson.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Recognize the student's spoken words so the tutor can respond.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

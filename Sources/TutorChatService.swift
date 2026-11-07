@@ -22,6 +22,7 @@ struct TutorChatRequest: Encodable {
     let subject: String
     let weekNumber: Int
     let lecturePrompt: String
+    let action: String?
     let messages: [Message]
     let canvasItems: [String]
     let imageBase64: String?
@@ -34,6 +35,15 @@ struct TutorChatResponse: Decodable {
     let imageError: String?
 }
 
+private struct TutorTranscriptionRequest: Encodable {
+    let audioBase64: String
+    let mimeType = "audio/mp4"
+}
+
+private struct TutorTranscriptionResponse: Decodable {
+    let text: String
+}
+
 struct TutorChatService {
     private let client: LearningAIHTTPClient
 
@@ -43,5 +53,11 @@ struct TutorChatService {
 
     func send(_ request: TutorChatRequest) async throws -> TutorChatResponse {
         try await client.post("api/tutor/chat", body: request)
+    }
+
+    func transcribe(audio: Data) async throws -> String {
+        let request = TutorTranscriptionRequest(audioBase64: audio.base64EncodedString())
+        let response: TutorTranscriptionResponse = try await client.post("api/tutor/transcribe", body: request)
+        return response.text
     }
 }
