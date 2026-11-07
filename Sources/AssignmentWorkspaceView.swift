@@ -8,6 +8,8 @@ struct AssignmentWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     let assignment: Assignment
 
+    @State private var revisedAssignment: Assignment?
+    @State private var showingChangeRequest = false
     @State private var drawing = PKDrawing()
     @State private var isGrading = false
     @State private var isGeneratingRetry = false
@@ -16,6 +18,8 @@ struct AssignmentWorkspaceView: View {
     @State private var retryError: String?
     @State private var retryAssignment: Assignment?
     private let gradeStore = AssignmentGradeStore()
+
+    private var currentAssignment: Assignment { revisedAssignment ?? assignment }
 
     var body: some View {
         ScrollView {
@@ -27,7 +31,7 @@ struct AssignmentWorkspaceView: View {
                         Label("Your work", systemImage: "pencil.tip.crop.circle")
                             .font(.headline)
                         Spacer()
-                        Text(documents.status(for: assignment.id))
+                        Text(documents.status(for: currentAssignment.id))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -53,19 +57,28 @@ struct AssignmentWorkspaceView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle(assignment.title)
+        .sheet(isPresented: $showingChangeRequest) {
+            AssignmentChangeRequestView(assignment: currentAssignment, student: profiles.selectedStudent) { updated in
+                revisedAssignment = updated
+                grade = nil
+                gradeStore.delete(assignmentID: updated.id)
+                profiles.clearRecordedGrade(for: updated, studentID: profiles.selectedStudent.id)
+                profiles.saveAssignmentOverride(updated, studentID: profiles.selectedStudent.id)
+            }
+        }
+        .navigationTitle(currentAssignment.title)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            drawing = documents.drawing(for: assignment.id)
-            grade = gradeStore.load(assignmentID: assignment.id)
-            retryAssignment = profiles.retryAssignments.last { $0.parentAssignmentID == assignment.id }
+            drawing = documents.drawing(for: currentAssignment.id)
+            grade = gradeStore.load(assignmentID: currentAssignment.id)
+            retryAssignment = profiles.retryAssignments.last { $0.parentAssignmentID == currentAssignment.id }
         }
         .onChange(of: drawing) { _, newDrawing in
-            documents.updateDrawing(newDrawing, for: assignment.id)
+            documents.updateDrawing(newDrawing, for: currentAssignment.id)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                documents.flushSave(for: assignment.id)
+                documents.flushSave(for: currentAssignment.id)
             }
         }
     }
@@ -131,7 +144,7 @@ struct AssignmentWorkspaceView: View {
 
     @ViewBuilder
     private func homeworkOutcome(for grade: AssignmentGrade) -> some View {
-        if assignment.isHomework {
+        if currentAssignment.isHomework {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: grade.isPassing ? "checkmark.seal.fill" : "xmark.seal.fill")
@@ -181,7 +194,7 @@ struct AssignmentWorkspaceView: View {
         defer { isGrading = false }
         do {
             let result = try await AssignmentGradingService().grade(
-                assignment,
+                currentAssignment,
                 student: profiles.selectedStudent,
                 drawing: drawing
             )
@@ -193,8 +206,8 @@ struct AssignmentWorkspaceView: View {
 
     private func saveGrade(_ result: AssignmentGrade) {
         grade = result
-        gradeStore.save(result, assignmentID: assignment.id)
-        profiles.recordGrade(result, for: assignment, studentID: profiles.selectedStudent.id)
+        gradeStore.save(result, assignmentID: currentAssignment.id)
+        profiles.recordGrade(result, for: currentAssignment, studentID: profiles.selectedStudent.id)
     }
 
     @MainActor
@@ -221,24 +234,24 @@ struct AssignmentWorkspaceView: View {
         let feedback = retryFeedback(in: grade)
         return AssignmentGenerationRequest(
             student: AIStudentContext(name: student.name, age: student.age, gradeLevel: student.gradeLevel),
-            subject: assignment.subject,
-            topic: assignment.title,
-            objective: "Create a fresh new attempt. Focus on these skills: \(skills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(assignment.prompt). Grading feedback to address: \(feedback)",
+            subject: currentAssignment.subject,
+            topic: currentAssignment.title,
+            objective: "Create a fresh new attempt. Focus on these skills: \(skills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(currentAssignment.prompt). Grading feedback to address: \(feedback)",
             count: 1,
-            pointsPerAssignment: assignment.points,
+            pointsPerAssignment: currentAssignment.points,
             targetedSkills: skills
         )
     }
 
     private func failedSkills(in grade: AssignmentGrade) -> [String] {
         var skills: [String] = []
-        let mappedSkills = assignment.questionSkills ?? []
+        let mappedSkills = currentAssignment.questionSkills ?? []
         for (index, item) in grade.items.enumerated() where !item.isCorrect {
             guard mappedSkills.indices.contains(index) else { continue }
             let skill = mappedSkills[index]
             if !skills.contains(skill) { skills.append(skill) }
         }
-        return skills.isEmpty ? [assignment.subject] : skills
+        return skills.isEmpty ? [currentAssignment.subject] : skills
     }
 
     private func retryFeedback(in grade: AssignmentGrade) -> String {
@@ -253,7 +266,7 @@ struct AssignmentWorkspaceView: View {
         let attempt = generated.makeAssignment(
             dueDate: "New attempt",
             studentID: studentID,
-            parentAssignmentID: assignment.id,
+            parentAssignmentID: currentAssignment.id,
             titlePrefix: "Retry · "
         )
         profiles.addRetryAssignment(attempt)
@@ -262,20 +275,27 @@ struct AssignmentWorkspaceView: View {
 
     private var assignmentHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(assignment.subject.uppercased())
+            Text(currentAssignment.subject.uppercased())
                 .font(.caption.weight(.bold))
                 .tracking(1)
                 .foregroundStyle(.indigo)
-            Text(assignment.title)
+            Text(currentAssignment.title)
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.primary)
-            Text("Due \(assignment.dueDate) · \(assignment.points) points")
+            Text("Due \(currentAssignment.dueDate) · \(currentAssignment.points) points")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text(assignment.prompt)
+            Text(currentAssignment.prompt)
                 .font(.body)
                 .foregroundStyle(.primary)
                 .padding(.top, 4)
+            Button {
+                showingChangeRequest = true
+            } label: {
+                Label("Adjust this worksheet", systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.bordered)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
@@ -283,32 +303,47 @@ struct AssignmentWorkspaceView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(.quaternary, lineWidth: 1))
     }
 
-    private var questionWorkAreaHeight: CGFloat {
-        let questionCount = CGFloat(max(assignment.questions.count, 1))
-        let standardWritingArea = max(160, min(240, 1_000 / questionCount))
-        return standardWritingArea * 8
+    private let standardExerciseHeight: CGFloat = 220
+    private let exercisesPerPage = 4
+    private let standardPageHeight: CGFloat = 1_020
+
+    private var pageCount: Int {
+        max(1, Int(ceil(Double(currentAssignment.questions.count) / Double(exercisesPerPage))))
     }
 
     private var worksheetHeight: CGFloat {
-        max(620, 84 + CGFloat(assignment.questions.count) * questionWorkAreaHeight + 48)
+        CGFloat(pageCount) * standardPageHeight
     }
 
     private var worksheet: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("WORKSHEET")
-                    .font(.caption.weight(.bold))
-                    .tracking(1.1)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(assignment.points) points")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 20)
+            worksheetPageHeading(page: 1)
 
-            ForEach(Array(assignment.questions.enumerated()), id: \.offset) { _, question in
+            ForEach(Array(currentAssignment.questions.enumerated()), id: \.offset) { index, question in
+                if index > 0 && index.isMultiple(of: exercisesPerPage) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.18))
+                        .frame(height: 2)
+                        .padding(.vertical, 18)
+                    worksheetPageHeading(page: index / exercisesPerPage + 1)
+                }
+
                 VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        Text("Exercise \(index + 1)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.indigo)
+                        Spacer()
+                        if let skill = currentAssignment.questionSkills, skill.indices.contains(index) {
+                            Text(skill[index]).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let illustrations = currentAssignment.questionIllustrations,
+                       illustrations.indices.contains(index), !illustrations[index].isEmpty {
+                        Text(illustrations[index])
+                            .font(.system(size: 34))
+                            .accessibilityLabel("Exercise illustration")
+                    }
                     Text(question)
                         .font(.body.weight(.medium))
                         .foregroundStyle(.primary)
@@ -319,7 +354,7 @@ struct AssignmentWorkspaceView: View {
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: questionWorkAreaHeight, alignment: .topLeading)
+                .frame(height: exerciseHeight(for: index), alignment: .topLeading)
             }
         }
         .padding(24)
@@ -331,6 +366,27 @@ struct AssignmentWorkspaceView: View {
                 .padding(.top, 12)
         }
     }
+
+    private func worksheetPageHeading(page: Int) -> some View {
+        HStack {
+            Text(page == 1 ? "WORKSHEET" : "WORKSHEET · PAGE \(page)")
+                .font(.caption.weight(.bold))
+                .tracking(1.1)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text("\(currentAssignment.points) points")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.bottom, 18)
+    }
+
+    private func exerciseHeight(for index: Int) -> CGFloat {
+        let saved = currentAssignment.writingSpaceMultipliers
+        let multiplier = saved?.indices.contains(index) == true ? saved![index] : 1
+        return standardExerciseHeight * CGFloat(min(3, max(1, multiplier)))
+    }
+
 }
 
 
@@ -347,5 +403,67 @@ private struct AssignmentGradeItemRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.background, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+
+private struct AssignmentChangeRequestView: View {
+    @Environment(\.dismiss) private var dismiss
+    let assignment: Assignment
+    let student: StudentProfile
+    let onSaved: (Assignment) -> Void
+
+    @State private var request = ""
+    @State private var isApplying = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Change request") {
+                    TextEditor(text: $request)
+                        .frame(minHeight: 130)
+                    Text("Describe what to change and name an exercise or skill when possible.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("Examples") {
+                    Text("Add 5 more problems about counting by 10s.")
+                    Text("Give exercise 2 twice as much writing space.")
+                    Text("Add an illustration to exercise 3.")
+                }
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle("Adjust worksheet")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.disabled(isApplying)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await applyRequest() }
+                    } label: {
+                        if isApplying { ProgressView() } else { Text("Apply") }
+                    }
+                    .disabled(isApplying || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func applyRequest() async {
+        isApplying = true
+        errorMessage = nil
+        defer { isApplying = false }
+        do {
+            let updated = try await AssignmentAdjustmentService().adjust(assignment, for: student, request: request)
+            onSaved(updated)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

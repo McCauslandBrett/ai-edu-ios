@@ -47,6 +47,8 @@ struct GeneratedAssignment: Codable, Identifiable {
     let prompt: String
     let questions: [String]
     let questionSkills: [String]
+    var questionIllustrations: [String]? = nil
+    var writingSpaceMultipliers: [Double]? = nil
     let answerKey: [String]
     let rubric: String
     let points: Int
@@ -70,7 +72,9 @@ struct GeneratedAssignment: Codable, Identifiable {
             status: "Not started",
             questionSkills: questionSkills,
             studentID: studentID,
-            parentAssignmentID: parentAssignmentID
+            parentAssignmentID: parentAssignmentID,
+            questionIllustrations: questionIllustrations,
+            writingSpaceMultipliers: writingSpaceMultipliers
         )
     }
 }
@@ -94,4 +98,38 @@ struct GradeRequest: Encodable {
     let student: AIStudentContext
     let assignment: AssignmentPayload
     let imageBase64: String
+}
+
+
+struct AssignmentAdjustmentRequest: Encodable {
+    let student: AIStudentContext
+    let assignment: Assignment
+    let changeRequest: String
+}
+
+struct AssignmentAdjustmentResponse: Decodable {
+    let id: String
+    let title: String
+    let subject: String
+    let dueDate: String
+    let points: Int
+    let prompt: String
+    let questions: [String]
+    let questionSkills: [String]
+    let questionIllustrations: [String]?
+    let writingSpaceMultipliers: [Double]?
+    let answerKey: [String]
+    let rubric: String
+    let status: String
+    let studentID: String?
+    let parentAssignmentID: String?
+
+    func makeAssignment() -> Assignment {
+        Assignment(
+            id: id, subject: subject, title: title, dueDate: dueDate, points: points,
+            prompt: prompt, questions: questions, answerKey: answerKey, rubric: rubric, status: status,
+            questionSkills: questionSkills, studentID: studentID, parentAssignmentID: parentAssignmentID,
+            questionIllustrations: questionIllustrations, writingSpaceMultipliers: writingSpaceMultipliers
+        )
+    }
 }

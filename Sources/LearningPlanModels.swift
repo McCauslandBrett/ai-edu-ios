@@ -36,6 +36,8 @@ struct GeneratedLearningPlan: Codable {
         let prompt: String
         let questions: [String]
         var questionSkills: [String]? = nil
+        var questionIllustrations: [String]? = nil
+        var writingSpaceMultipliers: [Double]? = nil
         let answerKey: [String]
         let rubric: String
         let points: Int
@@ -67,7 +69,9 @@ struct GeneratedLearningPlan: Codable {
                 rubric: rubric,
                 status: assessment ? "Assessment" : "Not started",
                 questionSkills: linkedSkills,
-                studentID: studentID
+                studentID: studentID,
+                questionIllustrations: questionIllustrations,
+                writingSpaceMultipliers: writingSpaceMultipliers
             )
         }
     }

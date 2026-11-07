@@ -38,6 +38,7 @@
 		100000000000000000000070 /* TutorChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000071 /* TutorChatView.swift */; };
 		100000000000000000000072 /* TutorSpeechController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000073 /* TutorSpeechController.swift */; };
 		100000000000000000000074 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000075 /* Assets.xcassets */; };
+		100000000000000000000076 /* AssignmentAdjustmentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000077 /* AssignmentAdjustmentService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +74,7 @@
 		100000000000000000000071 /* TutorChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorChatView.swift; sourceTree = "<group>"; };
 		100000000000000000000073 /* TutorSpeechController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorSpeechController.swift; sourceTree = "<group>"; };
 		100000000000000000000075 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		100000000000000000000077 /* AssignmentAdjustmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentAdjustmentService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +137,7 @@
 				10000000000000000000006F /* TutorChatService.swift */,
 				100000000000000000000071 /* TutorChatView.swift */,
 				100000000000000000000073 /* TutorSpeechController.swift */,
+				100000000000000000000077 /* AssignmentAdjustmentService.swift */,
 				100000000000000000000075 /* Assets.xcassets */,
 			);
 			path = Sources;
@@ -233,6 +236,7 @@
 				10000000000000000000006E /* TutorChatService.swift in Sources */,
 				100000000000000000000070 /* TutorChatView.swift in Sources */,
 				100000000000000000000072 /* TutorSpeechController.swift in Sources */,
+				100000000000000000000076 /* AssignmentAdjustmentService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -48,6 +48,10 @@ struct StudentProfilePersistence {
         decode([StudentActivityEvent].self, for: Key.activityEvents) ?? []
     }
 
+    func loadAssignmentOverrides() -> [String: Assignment] {
+        decode([String: Assignment].self, for: Key.assignmentOverrides) ?? [:]
+    }
+
     func loadSelectedStudentID(fallback: String) -> String {
         defaults.string(forKey: Key.selectedStudentID) ?? fallback
     }
@@ -56,12 +60,14 @@ struct StudentProfilePersistence {
         students: [StudentProfile],
         subjectPlans: [String: StudentSubjectPlan],
         retryAssignments: [Assignment],
-        activityEvents: [StudentActivityEvent]
+        activityEvents: [StudentActivityEvent],
+        assignmentOverrides: [String: Assignment]
     ) {
         saveEncoded(students, for: Key.students)
         saveEncoded(subjectPlans, for: Key.subjectPlans)
         saveEncoded(retryAssignments, for: Key.retryAssignments)
         saveEncoded(activityEvents, for: Key.activityEvents)
+        saveEncoded(assignmentOverrides, for: Key.assignmentOverrides)
     }
 
     private func decode<Value: Decodable>(_ type: Value.Type, for key: String) -> Value? {
@@ -83,6 +89,7 @@ struct StudentProfilePersistence {
         static let subjectPlans = "studentSubjectPlans"
         static let retryAssignments = "retryAssignments"
         static let activityEvents = "studentActivityEvents"
+        static let assignmentOverrides = "assignmentOverrides"
         static let selectedStudentID = "selectedStudentID"
     }
 }

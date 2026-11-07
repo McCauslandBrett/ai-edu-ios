@@ -7,6 +7,7 @@ final class StudentProfileStore: ObservableObject {
     @Published private(set) var subjectPlans: [String: StudentSubjectPlan]
     @Published private(set) var retryAssignments: [Assignment]
     @Published private(set) var activityEvents: [StudentActivityEvent]
+    @Published private(set) var assignmentOverrides: [String: Assignment]
     @Published var selectedStudentID: String {
         didSet { persistence.saveSelectedStudentID(selectedStudentID) }
     }
@@ -20,6 +21,7 @@ final class StudentProfileStore: ObservableObject {
         self.subjectPlans = persistence.loadSubjectPlans()
         self.retryAssignments = persistence.loadRetryAssignments()
         self.activityEvents = persistence.loadActivityEvents()
+        self.assignmentOverrides = persistence.loadAssignmentOverrides()
         self.selectedStudentID = persistence.loadSelectedStudentID(fallback: initialStudents.first?.id ?? "student-1")
     }
 
@@ -46,6 +48,27 @@ final class StudentProfileStore: ObservableObject {
                 students[index] = profile
             }
         }
+        persist()
+    }
+
+    func saveAssignmentOverride(_ assignment: Assignment, studentID: String) {
+        var studentAssignment = assignment
+        studentAssignment.studentID = studentID
+        assignmentOverrides[overrideKey(assignment.id, studentID: studentID)] = studentAssignment
+        if let index = retryAssignments.firstIndex(where: { $0.id == assignment.id && $0.studentID == studentID }) {
+            retryAssignments[index] = studentAssignment
+        }
+        persist()
+    }
+
+    func clearRecordedGrade(for assignment: Assignment, studentID: String) {
+        guard let key = subjectPlanKey(for: assignment.subject, studentID: studentID),
+              var saved = subjectPlans[key],
+              var results = saved.competencyResults else { return }
+        results.removeValue(forKey: assignment.id)
+        saved.competencyResults = results
+        updateCompetencyProgress(in: &saved)
+        subjectPlans[key] = saved
         persist()
     }
 
@@ -129,6 +152,7 @@ final class StudentProfileStore: ObservableObject {
         subjectPlans = subjectPlans.filter { $0.value.studentID != studentID }
         retryAssignments.removeAll { $0.studentID == studentID }
         activityEvents.removeAll { $0.studentID == studentID }
+        assignmentOverrides = assignmentOverrides.filter { $0.value.studentID != studentID }
         if selectedStudentID == studentID, let nextStudent = students.first {
             selectedStudentID = nextStudent.id
         }
@@ -151,9 +175,20 @@ final class StudentProfileStore: ObservableObject {
     }
 
     func assignments(for student: StudentProfile, subject: String? = nil) -> [Assignment] {
-        sampleAssignments(for: student, subject: subject)
-            + generatedAssignments(for: student, subject: subject)
-            + retryAttempts(for: student, subject: subject)
+        applyAssignmentOverrides(
+            sampleAssignments(for: student, subject: subject)
+                + generatedAssignments(for: student, subject: subject)
+                + retryAttempts(for: student, subject: subject),
+            studentID: student.id
+        )
+    }
+
+    private func applyAssignmentOverrides(_ assignments: [Assignment], studentID: String) -> [Assignment] {
+        assignments.map { assignmentOverrides[overrideKey($0.id, studentID: studentID)] ?? $0 }
+    }
+
+    private func overrideKey(_ assignmentID: String, studentID: String) -> String {
+        studentID + "::" + assignmentID
     }
 
     private func sampleAssignments(for student: StudentProfile, subject: String?) -> [Assignment] {
@@ -225,7 +260,7 @@ final class StudentProfileStore: ObservableObject {
         let relatedRetries = retryAssignments.filter {
             $0.studentID == saved.studentID && $0.subject.caseInsensitiveCompare(saved.subject) == .orderedSame
         }
-        let allAssignments = planAssignments + relatedRetries
+        let allAssignments = applyAssignmentOverrides(planAssignments + relatedRetries, studentID: saved.studentID)
         let skillTotals = questionCounts(in: allAssignments)
         let results = saved.competencyResults ?? [:]
 
@@ -299,7 +334,8 @@ final class StudentProfileStore: ObservableObject {
             students: students,
             subjectPlans: subjectPlans,
             retryAssignments: retryAssignments,
-            activityEvents: activityEvents
+            activityEvents: activityEvents,
+            assignmentOverrides: assignmentOverrides
         )
     }
 }
