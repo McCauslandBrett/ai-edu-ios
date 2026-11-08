@@ -66,7 +66,10 @@ final class AssignmentWorkspaceModel: ObservableObject {
             questionIllustrations: adjusted.questionIllustrations,
             writingSpaceMultipliers: adjusted.writingSpaceMultipliers,
             resourceURL: assignment.resourceURL,
-            resourceTitle: assignment.resourceTitle
+            resourceTitle: assignment.resourceTitle,
+            resourcePageNumber: assignment.resourcePageNumber,
+            printedPageNumber: assignment.printedPageNumber,
+            answerKeyResourceURL: assignment.answerKeyResourceURL
         )
         assignment = updated
         grade = nil

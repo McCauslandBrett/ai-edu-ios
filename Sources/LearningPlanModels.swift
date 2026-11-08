@@ -40,6 +40,9 @@ struct GeneratedLearningPlan: Codable {
         var writingSpaceMultipliers: [Double]? = nil
         var resourceURL: String? = nil
         var resourceTitle: String? = nil
+        var resourcePageNumber: Int? = nil
+        var printedPageNumber: Int? = nil
+        var answerKeyResourceURL: String? = nil
         let answerKey: [String]
         let rubric: String
         let points: Int
@@ -51,9 +54,16 @@ struct GeneratedLearningPlan: Codable {
             assessment: Bool = false,
             trackedSkills: [String] = []
         ) -> Assignment {
-            let safeSubject = subject.lowercased().unicodeScalars.map {
-                CharacterSet.alphanumerics.contains($0) ? String($0) : "-"
-            }.joined()
+            let safeSubject: String
+            if id.hasPrefix("mep-v3-y"),
+               let year = id.dropFirst("mep-v3-y".count).split(separator: "-").first {
+                // Keep the long-lived workbook identity when the visible template name changes.
+                safeSubject = "year-\(year)-math"
+            } else {
+                safeSubject = subject.lowercased().unicodeScalars.map {
+                    CharacterSet.alphanumerics.contains($0) ? String($0) : "-"
+                }.joined()
+            }
             let linkedSkills = questionSkills?.count == questions.count
                 ? questionSkills!
                 : questions.indices.map { index in
@@ -75,7 +85,10 @@ struct GeneratedLearningPlan: Codable {
                 questionIllustrations: questionIllustrations,
                 writingSpaceMultipliers: writingSpaceMultipliers,
                 resourceURL: resourceURL,
-                resourceTitle: resourceTitle
+                resourceTitle: resourceTitle,
+                resourcePageNumber: resourcePageNumber,
+                printedPageNumber: printedPageNumber,
+                answerKeyResourceURL: answerKeyResourceURL
             )
         }
     }
@@ -94,7 +107,9 @@ struct GeneratedLearningPlan: Codable {
         let weekNumber: Int
         let theme: String
         let lecturePrompt: String
+        var overview: String? = nil
         var youtubeVideo: SuggestedVideo? = nil
+        var youtubeVideos: [SuggestedVideo]? = nil
         let assessment: PlannedActivity
         let assignments: [PlannedActivity]
     }

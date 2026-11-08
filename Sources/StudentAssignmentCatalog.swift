@@ -41,7 +41,21 @@ struct StudentAssignmentCatalog {
         studentID: String,
         overrides: [String: Assignment]
     ) -> [Assignment] {
-        assignments.map { overrides[overrideKey($0.id, studentID: studentID)] ?? $0 }
+        assignments.map { assignment in
+            let currentKey = overrideKey(assignment.id, studentID: studentID)
+            let legacyID = assignment.id.replacingOccurrences(of: "-mep-v3-y", with: "-mep-y")
+            guard let saved = overrides[currentKey] ?? overrides[overrideKey(legacyID, studentID: studentID)] else {
+                return assignment
+            }
+            guard assignment.resourcePageNumber != nil else { return saved }
+            var updated = saved.reidentified(as: assignment.id)
+            updated.resourceURL = assignment.resourceURL
+            updated.resourceTitle = assignment.resourceTitle
+            updated.resourcePageNumber = assignment.resourcePageNumber
+            updated.printedPageNumber = assignment.printedPageNumber
+            updated.answerKeyResourceURL = assignment.answerKeyResourceURL
+            return updated
+        }
     }
 
     func overrideKey(_ assignmentID: String, studentID: String) -> String {

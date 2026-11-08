@@ -14,6 +14,7 @@ struct StudentSubjectPlan: Codable, Identifiable {
     let inputs: SubjectPlanInputs
     var plan: GeneratedLearningPlan
     var prebuiltSubjectID: String? = nil
+    var prebuiltContentVersion: Int? = nil
     var competencyResults: [String: [Bool]]? = nil
 
     var id: String { Self.key(studentID: studentID, subject: subject) }
@@ -39,7 +40,7 @@ struct MEPSubject: Identifiable {
     }
 
     static let catalog: [MEPSubject] = [
-        MEPSubject(id: "mep-year-1-math", name: "Year 1 Math", resources: [
+        MEPSubject(id: "mep-year-1-math", name: "MEP Math · Level 1", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y1objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y1overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y1facts.pdf", category: "Preparation"),
@@ -84,7 +85,7 @@ struct MEPSubject: Identifiable {
             Resource(title: "Shape Cards", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_master.pdf", category: "Shared teaching materials"),
             Resource(title: "Shape Cards with dots", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_coloured_master.pdf", category: "Shared teaching materials"),
         ]),
-        MEPSubject(id: "mep-year-2-math", name: "Year 2 Math", resources: [
+        MEPSubject(id: "mep-year-2-math", name: "MEP Math · Level 2", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y2objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y2overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y2facts.pdf", category: "Preparation"),
@@ -129,7 +130,7 @@ struct MEPSubject: Identifiable {
             Resource(title: "Shape Cards", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_master.pdf", category: "Shared teaching materials"),
             Resource(title: "Shape Cards with dots", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_coloured_master.pdf", category: "Shared teaching materials"),
         ]),
-        MEPSubject(id: "mep-year-3-math", name: "Year 3 Math", resources: [
+        MEPSubject(id: "mep-year-3-math", name: "MEP Math · Level 3", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y3objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y3overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y3facts.pdf", category: "Preparation"),
@@ -175,7 +176,7 @@ struct MEPSubject: Identifiable {
             Resource(title: "Shape Cards", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_master.pdf", category: "Shared teaching materials"),
             Resource(title: "Shape Cards with dots", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_coloured_master.pdf", category: "Shared teaching materials"),
         ]),
-        MEPSubject(id: "mep-year-4-math", name: "Year 4 Math", resources: [
+        MEPSubject(id: "mep-year-4-math", name: "MEP Math · Level 4", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y4objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y4overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y4facts.pdf", category: "Preparation"),
@@ -221,7 +222,7 @@ struct MEPSubject: Identifiable {
             Resource(title: "Shape Cards", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_master.pdf", category: "Shared teaching materials"),
             Resource(title: "Shape Cards with dots", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_coloured_master.pdf", category: "Shared teaching materials"),
         ]),
-        MEPSubject(id: "mep-year-5-math", name: "Year 5 Math", resources: [
+        MEPSubject(id: "mep-year-5-math", name: "MEP Math · Level 5", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y5objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y5overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y5facts.pdf", category: "Preparation"),
@@ -266,7 +267,7 @@ struct MEPSubject: Identifiable {
             Resource(title: "Shape Cards", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_master.pdf", category: "Shared teaching materials"),
             Resource(title: "Shape Cards with dots", url: "https://www.cimt.org.uk/projects/mepres/primary/manipulatives/shapes_coloured_master.pdf", category: "Shared teaching materials"),
         ]),
-        MEPSubject(id: "mep-year-6-math", name: "Year 6 Math", resources: [
+        MEPSubject(id: "mep-year-6-math", name: "MEP Math · Level 6", resources: [
             Resource(title: "Learning Objectives", url: "https://www.cimt.org.uk/projects/mepres/primary/y6objectives.pdf", category: "Preparation"),
             Resource(title: "Overview", url: "https://www.cimt.org.uk/projects/mepres/primary/y6overview.pdf", category: "Preparation"),
             Resource(title: "Facts to Know and Remember", url: "https://www.cimt.org.uk/projects/mepres/primary/y6facts.pdf", category: "Preparation"),

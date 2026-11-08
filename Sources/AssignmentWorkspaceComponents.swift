@@ -6,6 +6,7 @@ struct AssignmentWorksheetView: View {
     let assignment: Assignment
     @Binding var drawing: PKDrawing
     @ObservedObject var speech: AssignmentReadAloudController
+    @Binding var sourcePageText: String
 
     private let exercisesPerPage = 4
     private let standardExerciseHeight: CGFloat = 220
@@ -16,6 +17,25 @@ struct AssignmentWorksheetView: View {
     }
 
     var body: some View {
+        if let resourceURL = assignment.resourceURL,
+           let pageNumber = assignment.resourcePageNumber {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Original Practice Book · page \(assignment.printedPageNumber ?? pageNumber)")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Spacer()
+                    if !sourcePageText.isEmpty {
+                        AssignmentReadAloudButton(
+                            text: sourcePageText,
+                            id: "practice-book-page",
+                            speech: speech
+                        )
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                practiceBookPage(url: resourceURL, pageNumber: pageNumber)
+            }
+        } else {
         VStack(alignment: .leading, spacing: 0) {
             pageHeading(1)
             ForEach(Array(assignment.questions.enumerated()), id: \.offset) { index, question in
@@ -38,6 +58,28 @@ struct AssignmentWorksheetView: View {
                 questionReadAloudLayer
             }
         }
+        }
+    }
+
+    private func practiceBookPage(url: String, pageNumber: Int) -> some View {
+        GeometryReader { geometry in
+            let pageWidth = geometry.size.width
+            let pageHeight = pageWidth * 842 / 595
+            ZStack(alignment: .topLeading) {
+                MEPPracticeBookPageView(
+                    urlString: url,
+                    pageNumber: pageNumber,
+                    printedPageNumber: assignment.printedPageNumber,
+                    onTextLoaded: { sourcePageText = $0 }
+                )
+                .frame(width: pageWidth, height: pageHeight)
+                PencilCanvas(drawing: $drawing)
+                    .frame(width: pageWidth, height: pageHeight)
+            }
+            .frame(width: pageWidth, height: pageHeight)
+        }
+        .aspectRatio(595.0 / 842.0, contentMode: .fit)
+        .background(.white)
     }
 
     private var questionReadAloudLayer: some View {

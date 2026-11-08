@@ -49,6 +49,7 @@
 		100000000000000000000086 /* StudentAssignmentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000087 /* StudentAssignmentCatalog.swift */; };
 		100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000089 /* AssignmentReadAloudController.swift */; };
 		100000000000000000000090 /* MEPCurriculumPlanBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */; };
+		100000000000000000000092 /* MEPPracticeBookPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000093 /* MEPPracticeBookPageView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -95,6 +96,7 @@
 		100000000000000000000087 /* StudentAssignmentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentAssignmentCatalog.swift; sourceTree = "<group>"; };
 		100000000000000000000089 /* AssignmentReadAloudController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentReadAloudController.swift; sourceTree = "<group>"; };
 		100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPCurriculumPlanBuilder.swift; sourceTree = "<group>"; };
+		100000000000000000000093 /* MEPPracticeBookPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPPracticeBookPageView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,6 +170,7 @@
 				100000000000000000000087 /* StudentAssignmentCatalog.swift */,
 				100000000000000000000089 /* AssignmentReadAloudController.swift */,
 				100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */,
+				100000000000000000000093 /* MEPPracticeBookPageView.swift */,
 				100000000000000000000075 /* Assets.xcassets */,
 			);
 			path = Sources;
@@ -277,6 +280,7 @@
 				100000000000000000000086 /* StudentAssignmentCatalog.swift in Sources */,
 				100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */,
 				100000000000000000000090 /* MEPCurriculumPlanBuilder.swift in Sources */,
+				100000000000000000000092 /* MEPPracticeBookPageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

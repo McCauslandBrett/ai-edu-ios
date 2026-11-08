@@ -11,8 +11,7 @@ struct SubjectPlanView: View {
     var body: some View {
         List {
             SubjectPlanOverviewSection(student: student, subject: subject, saved: saved, fallback: fallback)
-            if let id = saved?.prebuiltSubjectID,
-               let curriculum = MEPSubject.catalog.first(where: { $0.id == id }) {
+            if let curriculum = prebuiltCurriculum {
                 Section("MEP curriculum") {
                     NavigationLink("Open workbooks and teaching materials") {
                         MEPResourceView(subject: curriculum, onAdd: nil)
@@ -27,7 +26,8 @@ struct SubjectPlanView: View {
                         subject: subject,
                         week: week,
                         trackedSkills: saved.plan.progress.map(\.subject),
-                        fullYearWeekCount: saved.plan.monthlyWindow.hasPrefix("Full-year") ? saved.plan.weeks.count : nil
+                        fullYearWeekCount: saved.plan.monthlyWindow.hasPrefix("Full-year") ? saved.plan.weeks.count : nil,
+                        prebuiltSubject: prebuiltCurriculum
                     )
                 }
             } else {
@@ -37,6 +37,11 @@ struct SubjectPlanView: View {
         }
         .navigationTitle(subject)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var prebuiltCurriculum: MEPSubject? {
+        guard let id = saved?.prebuiltSubjectID else { return nil }
+        return MEPSubject.catalog.first { $0.id == id }
     }
 }
 
@@ -88,11 +93,18 @@ private struct SubjectWeekSection: View {
     let week: GeneratedLearningPlan.Week
     let trackedSkills: [String]
     let fullYearWeekCount: Int?
+    let prebuiltSubject: MEPSubject?
     @State private var didCopyPrompt = false
     @State private var showingTutorChat = false
 
     var body: some View {
         Section("Week \(week.weekNumber) · \(week.theme)") {
+            Text(weekOverview)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 4)
+
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("Tutor lecture prompt", systemImage: "bubble.left.and.bubble.right")
@@ -109,17 +121,24 @@ private struct SubjectWeekSection: View {
                     .accessibilityLabel(didCopyPrompt ? "Prompt copied" : "Copy tutor lecture prompt")
                 }
                 Text(week.lecturePrompt).font(.subheadline)
-                if let video = week.youtubeVideo, let destination = video.destination {
+                if !weeklyVideos.isEmpty {
                     VStack(alignment: .leading, spacing: 5) {
-                        Label("Weekly video", systemImage: "play.rectangle.fill")
+                        Label("Weekly videos", systemImage: "play.rectangle.fill")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                        Link(destination: destination) {
-                            Label(video.title, systemImage: "play.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .multilineTextAlignment(.leading)
+                        ForEach(weeklyVideos, id: \.url) { video in
+                            if let destination = video.destination {
+                                Link(destination: destination) {
+                                    Label(video.title, systemImage: "play.fill")
+                                        .font(.subheadline.weight(.semibold))
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Text("\(video.channel) · \(video.reason)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if video.url != weeklyVideos.last?.url {
+                                    Divider()
+                                }
+                            }
                         }
-                        Text("\(video.channel) · \(video.reason)")
-                            .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,6 +187,23 @@ private struct SubjectWeekSection: View {
                 }
             }
         }
+    }
+
+    private var weekOverview: String {
+        if let prebuiltSubject {
+            return MEPCurriculumPlanBuilder().overview(for: prebuiltSubject, weekNumber: week.weekNumber)
+        }
+        if let overview = week.overview, !overview.isEmpty {
+            return overview
+        }
+        let assignmentCount = week.assignments.count
+        let assignmentLabel = assignmentCount == 1 ? "practice assignment" : "practice assignments"
+        return "Coverage: \(week.theme), with \(assignmentCount) planned \(assignmentLabel) and a weekly assessment."
+    }
+
+    private var weeklyVideos: [GeneratedLearningPlan.SuggestedVideo] {
+        if let videos = week.youtubeVideos, !videos.isEmpty { return videos }
+        return week.youtubeVideo.map { [$0] } ?? []
     }
 
     private var assessmentTitle: String {

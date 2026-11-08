@@ -18,8 +18,37 @@ struct Assignment: Identifiable, Codable, Hashable {
     var writingSpaceMultipliers: [Double]? = nil
     var resourceURL: String? = nil
     var resourceTitle: String? = nil
+    /// One-based page number in the linked split Practice Book PDF.
+    var resourcePageNumber: Int? = nil
+    var printedPageNumber: Int? = nil
+    var answerKeyResourceURL: String? = nil
 
     var isHomework: Bool { status != "Assessment" }
+
+    func reidentified(as newID: String) -> Assignment {
+        Assignment(
+            id: newID,
+            subject: subject,
+            title: title,
+            dueDate: dueDate,
+            points: points,
+            prompt: prompt,
+            questions: questions,
+            answerKey: answerKey,
+            rubric: rubric,
+            status: status,
+            questionSkills: questionSkills,
+            studentID: studentID,
+            parentAssignmentID: parentAssignmentID,
+            questionIllustrations: questionIllustrations,
+            writingSpaceMultipliers: writingSpaceMultipliers,
+            resourceURL: resourceURL,
+            resourceTitle: resourceTitle,
+            resourcePageNumber: resourcePageNumber,
+            printedPageNumber: printedPageNumber,
+            answerKeyResourceURL: answerKeyResourceURL
+        )
+    }
 
     static let samples: [Assignment] = [
         Assignment(

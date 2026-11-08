@@ -1,9 +1,10 @@
 import Foundation
 
-/// Converts the existing MEP resource catalogue into a year-long, skill-linked plan.
-/// The source PDFs remain the curriculum; these companion worksheets make weekly work trackable in the app.
+/// Converts the MEP catalogue into a year-long plan whose worksheet activities open
+/// the original Practice Book pages. It does not invent substitute worksheet questions.
 struct MEPCurriculumPlanBuilder {
-    private let lessonsPerWeek = 4
+    private let weeksPerCourse = 4
+    private let worksheetsPerWeek = 4
     private let skills = [
         "Number and calculation",
         "Patterns and mathematical reasoning",
@@ -11,11 +12,19 @@ struct MEPCurriculumPlanBuilder {
         "Measurement and data"
     ]
 
+    func overview(for subject: MEPSubject, weekNumber: Int) -> String {
+        let year = yearNumber(in: subject)
+        let lessonCount = year == 6 ? 175 : 140
+        let lessons = lessonRange(for: weekNumber, lessonCount: lessonCount)
+        let pages = sampledPracticePages(in: lessons)
+        return "Compressed month plan · MEP lessons \(lessons.lowerBound)–\(lessons.upperBound). This week uses original Practice Book pages \(pages.map(String.init).joined(separator: ", ")); each page includes its printed exercises, diagrams, and response areas."
+    }
+
     func build(subject: MEPSubject, studentID: String) -> StudentSubjectPlan {
         let year = yearNumber(in: subject)
         let lessonCount = year == 6 ? 175 : 140
-        let weekCount = Int(ceil(Double(lessonCount) / Double(lessonsPerWeek)))
-        let objective = "Follow the MEP Year \(year) mathematics curriculum. Each week is organized around four sequential MEP lessons, with companion practice linked to the original workbook."
+        let weekCount = weeksPerCourse
+        let objective = "Complete a four-week accelerated survey of MEP Math Level \(year). Each week covers about one quarter of the level and uses four original Practice Book pages spaced across that material."
         let weeks = (1...weekCount).map { weekNumber in
             makeWeek(weekNumber, year: year, lessonCount: lessonCount, subject: subject)
         }
@@ -48,7 +57,7 @@ struct MEPCurriculumPlanBuilder {
         let plan = GeneratedLearningPlan(
             subject: subject.name,
             objective: objective,
-            monthlyWindow: "Full-year curriculum · \(weekCount) weeks · four lessons per week",
+            monthlyWindow: "4-week accelerated MEP Math Level \(year) plan · four Practice Book worksheets per week",
             milestones: milestones,
             progress: progress,
             weeks: weeks
@@ -61,10 +70,11 @@ struct MEPCurriculumPlanBuilder {
                 learningOutcome: objective,
                 highestAssessmentLevel: "",
                 priorAssessmentResults: [],
-                instructorContext: "CIMT Mathematics Enhancement Programme · MEP Year \(year)"
+                instructorContext: "CIMT Mathematics Enhancement Programme · MEP Math Level \(year)"
             ),
             plan: plan,
-            prebuiltSubjectID: subject.id
+            prebuiltSubjectID: subject.id,
+            prebuiltContentVersion: 4
         )
     }
 
@@ -74,107 +84,174 @@ struct MEPCurriculumPlanBuilder {
         lessonCount: Int,
         subject: MEPSubject
     ) -> GeneratedLearningPlan.Week {
-        let firstLesson = (weekNumber - 1) * lessonsPerWeek + 1
-        let lastLesson = min(weekNumber * lessonsPerWeek, lessonCount)
+        let lessonRange = lessonRange(for: weekNumber, lessonCount: lessonCount)
+        let firstLesson = lessonRange.lowerBound
+        let lastLesson = lessonRange.upperBound
         let theme = "Lessons \(firstLesson)–\(lastLesson)"
-        let weeklyVideo = video(for: year, weekNumber: weekNumber)
-        let workbook = resource(in: subject, category: "Workbooks", covering: firstLesson)
-        let lessonPlan = resource(in: subject, category: "Lesson plans", covering: firstLesson)
+        let weeklyVideos = videos(for: year, weekNumber: weekNumber)
+        let overview = overview(for: subject, weekNumber: weekNumber)
+        let lessonPlans = resources(in: subject, category: "Lesson plans", overlapping: lessonRange)
         let lecturePrompt = [
-            "Teach the MEP Year \(year) material for lessons \(firstLesson) through \(lastLesson).",
-            "Use the official lesson plan and practice book linked from this subject's MEP curriculum resources.",
+            "Teach a compressed four-week survey of MEP Math Level \(year), lessons \(firstLesson) through \(lastLesson). Prioritize the central concepts and connect related lessons rather than trying to teach every lesson in full depth.",
+            "Use the official lesson plans and original Practice Book pages linked from this subject's MEP curriculum resources.",
             "Connect explanations to the student's age and school grade, model one example at a time, ask the student to explain their reasoning, and gently refocus the conversation if it drifts.",
-            "Finish by inviting the student to complete the linked workbook pages and this week's companion worksheet."
+            "Finish by opening and completing this week's four selected original Practice Book pages. The student can write directly over each source page in the app."
         ].joined(separator: " ")
 
-        let assignments = (1...4).map { assignmentNumber in
-            makeActivity(
+        let pages = sampledPracticePages(in: lessonRange)
+        let assignments = pages.enumerated().map { offset, pageNumber in
+            let workbook = resource(in: subject, category: "Workbooks", covering: pageNumber)
+            return makeActivity(
                 year: year,
+                subjectName: subject.name,
                 weekNumber: weekNumber,
-                assignmentNumber: assignmentNumber,
-                lessonRange: firstLesson...lastLesson,
+                assignmentNumber: offset + 1,
+                pageNumber: pageNumber,
                 assessment: false,
                 resource: workbook
             )
         }
+        let assessmentPage = lastLesson
+        let assessmentWorkbook = resource(in: subject, category: "Workbooks", covering: assessmentPage)
         let assessment = makeActivity(
             year: year,
+            subjectName: subject.name,
             weekNumber: weekNumber,
             assignmentNumber: 0,
-            lessonRange: firstLesson...lastLesson,
+            pageNumber: assessmentPage,
             assessment: true,
-            resource: nil
+            resource: assessmentWorkbook
         )
 
-        // Include the lesson plan URL in the tutor prompt while leaving every original resource
-        // available in MEPResourceView.
-        let promptWithLessonPlan = lessonPlan.map { lecturePrompt + " Official lesson plan: \($0.url)" } ?? lecturePrompt
+        // Link every lesson-plan segment crossed by this accelerated week's lesson range.
+        let lessonPlanLinks = lessonPlans.map { "\($0.title): \($0.url)" }.joined(separator: " ")
+        let promptWithLessonPlan = lessonPlanLinks.isEmpty
+            ? lecturePrompt
+            : lecturePrompt + " Official lesson plan resources: " + lessonPlanLinks
         return GeneratedLearningPlan.Week(
             weekNumber: weekNumber,
             theme: theme,
             lecturePrompt: promptWithLessonPlan,
-            youtubeVideo: weeklyVideo,
+            overview: overview,
+            youtubeVideo: weeklyVideos.first,
+            youtubeVideos: weeklyVideos,
             assessment: assessment,
             assignments: assignments
         )
     }
 
-    private func video(for year: Int, weekNumber: Int) -> GeneratedLearningPlan.SuggestedVideo {
-        let videos: [GeneratedLearningPlan.SuggestedVideo]
+    private func videos(for year: Int, weekNumber: Int) -> [GeneratedLearningPlan.SuggestedVideo] {
+        let videoLibrary: [GeneratedLearningPlan.SuggestedVideo]
         switch year {
         case 1:
-            videos = [
+            videoLibrary = [
                 video("Adding 1 vs. adding 10", "mKsKU0BAiRM", topic: "place value and adding tens"),
                 video("Recognizing shapes", "10dTx1Zy_4w", topic: "naming and describing shapes"),
-                video("Introduction to place value", "wx2gI8iwMCA", topic: "ones and tens")
+                video("Introduction to place value", "wx2gI8iwMCA", topic: "ones and tens"),
+                video("Counting in pictures", "leDYnoNSvD4", topic: "counting pictured objects"),
+                video("Counting in order", "PEeUTQ0Gri8", topic: "counting objects in sequence"),
+                video("Adding 8 + 7", "AK0NZITv5Ns", topic: "making ten to add"),
+                video("Skip counting by 5", "UwWn84u6i8s", topic: "skip counting by fives"),
+                video("Number grid", "9XZypM2Z3Ro", topic: "number patterns through 100"),
+                video("Counting with small numbers", "y2-uaPiyoxc", topic: "counting small groups"),
+                video("Halves and fourths", "0lSTXtwPuOU", topic: "sharing shapes into equal parts"),
+                video("Adding 7 + 6", "ZgzpTx-s9Zo", topic: "making ten to add"),
+                video("Comparison word problems", "osIFa9zcI-w", topic: "comparing quantities in story problems")
             ]
         case 2:
-            videos = [
+            videoLibrary = [
                 video("Adding 2-digit numbers without regrouping", "EV38zfiY6Vs", topic: "two-digit addition"),
                 video("Addition and subtraction", "MwerJr42bQw", topic: "addition and subtraction stories"),
-                video("Recognizing shapes", "10dTx1Zy_4w", topic: "naming and describing shapes"),
-                video("Introduction to place value", "wx2gI8iwMCA", topic: "ones and tens")
+                video("Subtracting a 1-digit number with regrouping", "zvetEuVJ0bE", topic: "regrouping when subtracting"),
+                video("Subtracting two-digit numbers without regrouping", "RzEFGpe0rv4", topic: "subtracting tens and ones"),
+                video("Subtracting 3-digit numbers without regrouping", "i8r7ZTUqB9w", topic: "hundreds, tens, and ones"),
+                video("Subtracting with regrouping", "Ds226Vh7epg", topic: "subtracting by regrouping tens and ones"),
+                video("Comparing inches and centimeters", "CSWPyCaIMsQ", topic: "measuring length in different units", channel: "YouTube"),
+                video("Measuring with a broken ruler", "A6owsT9NBpQ", topic: "measuring length from a shifted starting point", channel: "YouTube"),
+                video("Telling time to the nearest five minutes", "h6RNkQ7lU8Y", topic: "reading an analog clock", channel: "LearnZillion"),
+                video("Line plot song", "VS1fLbeuRkU", topic: "organizing measurement data on a line plot", channel: "YouTube"),
+                video("Creating a line plot", "xa2ICYALJ9Y", topic: "representing data on a line plot", channel: "YouTube"),
+                video("Picture graphs and bar graphs", "_H0M0XzjmIA", topic: "reading picture and bar graphs", channel: "YouTube")
             ]
         case 3:
-            videos = [
+            videoLibrary = [
                 video("Practice finding patterns in numbers", "l-6uEtTBH7g", topic: "number patterns"),
                 video("Properties and patterns for multiplication", "um2nlNVM_YM", topic: "multiplication patterns"),
                 video("Finding perimeter when a side length is missing", "tmt5fXhU7Rs", topic: "perimeter and missing side lengths"),
-                video("Intuition for grams", "zqduFg0s5Q4", topic: "measuring mass")
+                video("Intuition for grams", "zqduFg0s5Q4", topic: "measuring mass"),
+                video("Representing one-step word problems", "ZVXimuY5FkE", topic: "translating a story into operations"),
+                video("Counting U.S. dollars and coins", "2E9ghvxEFTw", topic: "counting money and making totals"),
+                video("Patterns in a multiplication table", "3y4N_5_R8ME", topic: "finding patterns in multiplication facts"),
+                video("Representing word problems", "M7nJnjh0XKI", topic: "modeling a word problem"),
+                video("Solving division word problems", "l6sqk4RFHMc", topic: "division in equal-group stories"),
+                video("Solving another division word problem", "RiP6EgKEZNU", topic: "choosing division for a story problem"),
+                video("Solving multiplication word problems", "fs_r0vViUb8", topic: "multiplication in equal-group stories"),
+                video("Picture and bar graphs", "g-Xjkiiz1qw", topic: "representing and reading data")
             ]
         case 4:
-            videos = [
+            videoLibrary = [
                 video("Categorizing geometric shapes", "PiQxA9O7Rd8", topic: "classifying shapes and angles"),
                 video("Input & output tables: identifying the rule", "Y9oW96dhzg0", topic: "number patterns and rules"),
                 video("Metric system: units of distance", "I3kQJvR7ZIg", topic: "metric distance units"),
-                video("Multiplying 1-digit numbers by 10, 100, and 1000", "SG4gX-VGzog", topic: "place value and multiplication")
+                video("Multiplying 1-digit numbers by 10, 100, and 1000", "SG4gX-VGzog", topic: "place value and multiplication"),
+                video("Measuring angles with a circular protractor", "Ttji2_wBSEo", topic: "measuring angles"),
+                video("Calculating profit with multiplication", "iCA78yjz_HY", topic: "multiplication in a real-world problem"),
+                video("Multiplying two-digit numbers", "DaQlieZH1kk", topic: "multiplying two-digit numbers"),
+                video("Multiplying two-digit numbers with the distributive property", "3JmnxR8nEi8", topic: "breaking multiplication into place-value parts"),
+                video("Common fractions and decimals", "lh2mp0aqSh8", topic: "connecting common fractions and decimals"),
+                video("Comparing fractions visually with a bar", "ory05j2jgBM", topic: "comparing fractions with visual models"),
+                video("Comparing with multiplication", "KFzcwWTEDDI", topic: "comparing quantities using multiplication"),
+                video("Comparing with multiplication: another example", "hjnyAogBdBk", topic: "solving a multiplication comparison")
             ]
         case 5:
-            videos = [
+            videoLibrary = [
                 video("Number patterns: visualizing sequence relationships", "mqsIJucBn6c", topic: "number patterns"),
                 video("Common Fractions and Decimals", "sSHo2OwSOIM", topic: "fractions and decimals"),
                 video("Volume through decomposition", "feNWZEln6Nc", topic: "volume and measurement"),
-                video("Units of measurement word problem: volume", "PdHSs5_kx24", topic: "volume word problems")
+                video("Units of measurement word problem: volume", "PdHSs5_kx24", topic: "volume word problems"),
+                video("Multiplying fractions: visualizing", "hr_mTd-oJ-M", topic: "visual models for fraction multiplication"),
+                video("Dividing decimals with hundredths", "Hrjr5f5pZ84", topic: "decimal division"),
+                video("Decimal multiplication with grids", "3Phgu3ExLmY", topic: "area models for multiplying decimals"),
+                video("Creating volume expressions", "NDPTBKbWmy8", topic: "writing expressions for prism volume"),
+                video("Using fractions as division to create mixed numbers", "g8yk6zQDAek", topic: "fractions as division"),
+                video("Coordinate plane: graphing points", "4vNloi-zNjU", topic: "plotting points on a coordinate plane"),
+                video("Volume in unit cubes by decomposing shape", "gm87omItizk", topic: "finding volume by splitting a solid into parts"),
+                video("Adding decimals with thousandths", "_ayXtD83wBA", topic: "adding decimals by place value")
             ]
         default:
-            videos = [
+            videoLibrary = [
                 video("Introduction to ratios", "bIKmw0aTmYc", topic: "ratios and comparing quantities"),
                 video("Introduction to rates", "qGTYSAeLTOE", topic: "rates and unit comparisons"),
                 video("Finding area by breaking up the shape", "loAA3TCNAvU", topic: "area and geometry"),
-                video("How to interpret a histogram", "c02vjunQsJM", topic: "data and graphs")
+                video("How to interpret a histogram", "c02vjunQsJM", topic: "data and graphs"),
+                video("Comparing negatives with variables", "kQkeayQke8A", topic: "comparing negative values on a number line"),
+                video("Number opposites practice", "vRa6XxykfbY", topic: "opposites on a number line"),
+                video("Sorting absolute values on a number line", "MFoXK57sw9k", topic: "ordering absolute values"),
+                video("Comparing absolute values on a number line", "29P6bar7nHc", topic: "comparing absolute values"),
+                video("Negative numbers in real life: temperature and elevation", "qKOojMSCkTA", topic: "interpreting negative numbers in context", channel: "YouTube"),
+                video("Adding and subtracting negative numbers", "DBSviXhkubg", topic: "integer addition and subtraction", channel: "YouTube"),
+                video("Comparing negative and positive numbers", "9-f9eAiEF7g", topic: "ordering positive and negative values", channel: "YouTube"),
+                video("Thinking about shapes of data distributions", "2oJldeE4JcU", topic: "describing data distributions")
             ]
         }
-        return videos[(weekNumber - 1) % videos.count]
+
+        let videosPerWeek = 3
+        precondition(videoLibrary.count == weeksPerCourse * videosPerWeek)
+        precondition(Set(videoLibrary.map(\.url)).count == videoLibrary.count)
+        guard (1...weeksPerCourse).contains(weekNumber) else { return [] }
+        let startIndex = (weekNumber - 1) * videosPerWeek
+        return Array(videoLibrary[startIndex..<(startIndex + videosPerWeek)])
     }
 
     private func video(
         _ title: String,
         _ videoID: String,
-        topic: String
+        topic: String,
+        channel: String = "Khan Academy"
     ) -> GeneratedLearningPlan.SuggestedVideo {
         GeneratedLearningPlan.SuggestedVideo(
             title: title,
-            channel: "Khan Academy",
+            channel: channel,
             url: "https://www.youtube.com/watch?v=\(videoID)",
             reason: "A grade-appropriate video about \(topic), one of this week's practice topics."
         )
@@ -182,125 +259,70 @@ struct MEPCurriculumPlanBuilder {
 
     private func makeActivity(
         year: Int,
+        subjectName: String,
         weekNumber: Int,
         assignmentNumber: Int,
-        lessonRange: ClosedRange<Int>,
+        pageNumber: Int,
         assessment: Bool,
         resource: MEPSubject.Resource?
     ) -> GeneratedLearningPlan.PlannedActivity {
-        let offset = assessment ? 3 : assignmentNumber - 1
-        let questions = makeQuestions(year: year, weekNumber: weekNumber, offset: offset)
-        let label = assessment ? "Weekly skills check" : "MEP practice \(assignmentNumber) of 4"
+        let label = assessment ? "Weekly Practice Book check" : "Practice Book page \(pageNumber)"
+        let localPage = resource.flatMap { numberRange(in: $0.title)?.lowerBound }.map { pageNumber - $0 + 1 }
+        let answerKey = resource.flatMap { workbook in
+            subjectResourceAnswerKey(for: workbook, in: MEPSubject.catalog.first { $0.id == "mep-year-\(year)-math" })
+        }
         return GeneratedLearningPlan.PlannedActivity(
-            id: "mep-y\(year)-w\(weekNumber)-\(assessment ? "check" : "practice-\(assignmentNumber)")",
-            title: "\(label) · Lessons \(lessonRange.lowerBound)–\(lessonRange.upperBound)",
-            subject: "Year \(year) Math",
+            id: "mep-v3-y\(year)-w\(weekNumber)-\(assessment ? "check" : "practice-\(assignmentNumber)")",
+            title: "\(label) · Lesson \(pageNumber)",
+            subject: subjectName,
             prompt: assessment
-                ? "Show your work on this short check for MEP Year \(year), lessons \(lessonRange.lowerBound)–\(lessonRange.upperBound)."
-                : "Complete these companion problems, then work through MEP Year \(year), lessons \(lessonRange.lowerBound)–\(lessonRange.upperBound) in the linked official workbook.",
-            questions: questions.questions,
-            questionSkills: questions.questionSkills,
-            questionIllustrations: questions.illustrations,
-            writingSpaceMultipliers: Array(repeating: 1, count: questions.questions.count),
+                ? "Complete this original MEP Practice Book page as the weekly check. Show your work on the page, then compare with the official answer key."
+                : "Complete the original MEP Practice Book page shown below. Write directly on the page and use the linked answer key to review your work.",
+            questions: [],
+            questionSkills: [],
+            questionIllustrations: [],
+            writingSpaceMultipliers: [],
             resourceURL: resource?.url,
-            resourceTitle: resource.map { "MEP workbook · \($0.title)" },
-            answerKey: questions.answers,
-            rubric: "Award credit for the correct answer and visible working. For drawing or reasoning, accept any mathematically valid response that demonstrates the linked skill.",
-            points: 20
+            resourceTitle: resource.map { _ in "\(subjectName) Practice Book · page \(pageNumber)" },
+            resourcePageNumber: localPage,
+            printedPageNumber: pageNumber,
+            answerKeyResourceURL: answerKey?.url,
+            answerKey: [],
+            rubric: "Use the linked official MEP Practice Book answer key to review the student's work.",
+            points: 0
         )
     }
 
-    private func makeQuestions(year: Int, weekNumber: Int, offset: Int) -> (questions: [String], answers: [String], illustrations: [String], questionSkills: [String]) {
-        var questions: [String] = []
-        var answers: [String] = []
-        var illustrations: [String] = []
-        var questionSkills: [String] = []
-
-        // Five questions for each tracked skill. The same mapping is persisted on the
-        // assignment so every graded response contributes to exactly one skill.
-        for skillIndex in skills.indices {
-            for variation in 0..<5 {
-                let exerciseOffset = offset * 5 + variation
-                questionSkills.append(skills[skillIndex])
-                switch skillIndex {
-                case 0:
-                    let problem = arithmeticProblem(year: year, week: weekNumber, offset: exerciseOffset)
-                    questions.append(problem.question)
-                    answers.append(problem.answer)
-                    illustrations.append(["🔢  🔢  🔢", "➕", "➖", "✖️", "➗"][variation])
-                case 1:
-                    let start = year * 2 + weekNumber + exerciseOffset
-                    let step = max(2, year + (weekNumber % 4) + variation)
-                    questions.append("Continue the pattern: \(start), \(start + step), \(start + 2 * step), ___. Write the rule and the next two numbers.")
-                    answers.append("\(start + 3 * step), \(start + 4 * step); add \(step) each time.")
-                    illustrations.append("🔢  ➡️  🔢  ➡️  ___")
-                case 2:
-                    let problem = geometryProblem(year: year, week: weekNumber, offset: exerciseOffset)
-                    questions.append(problem.question)
-                    answers.append(problem.answer)
-                    illustrations.append(["△", "□", "▱", "📐", "🔷"][variation])
-                default:
-                    let problem = measurementProblem(year: year, week: weekNumber, offset: exerciseOffset)
-                    questions.append(problem.question)
-                    answers.append(problem.answer)
-                    illustrations.append(["📏", "⚖️", "🕒", "🧪", "📐"][variation])
-                }
-            }
-        }
-        return (questions, answers, illustrations, questionSkills)
+    private func lessonRange(for weekNumber: Int, lessonCount: Int) -> ClosedRange<Int> {
+        let baseCount = lessonCount / weeksPerCourse
+        let remainder = lessonCount % weeksPerCourse
+        let firstLesson = (weekNumber - 1) * baseCount + min(weekNumber - 1, remainder) + 1
+        let lessonCountForWeek = baseCount + (weekNumber <= remainder ? 1 : 0)
+        return firstLesson...(firstLesson + lessonCountForWeek - 1)
     }
 
-    private func geometryProblem(year: Int, week: Int, offset: Int) -> (question: String, answer: String) {
-        if year == 1 {
-            return ("Draw a triangle and mark each side. How many sides does it have?", "A triangle has 3 sides.")
+    private func sampledPracticePages(in lessons: ClosedRange<Int>) -> [Int] {
+        guard lessons.count > 1 else { return Array(repeating: lessons.lowerBound, count: worksheetsPerWeek) }
+        return (0..<worksheetsPerWeek).map { index in
+            lessons.lowerBound + ((lessons.count - 1) * index / (worksheetsPerWeek - 1))
         }
-        if year == 2 {
-            return ("Draw a square and show one line of symmetry. How many lines of symmetry does a square have?", "A square has 4 lines of symmetry.")
-        }
-        let width = 2 + (week % 4)
-        let length = max(width + 2, year + 5 + offset)
-        return (
-            "Draw a rectangle that is \(length) cm long and \(width) cm wide. Label both sides and find its perimeter.",
-            "A rectangle with opposite sides \(length) cm and \(width) cm; perimeter = \(2 * (length + width)) cm."
-        )
     }
 
-    private func arithmeticProblem(year: Int, week: Int, offset: Int) -> (question: String, answer: String) {
-        if year == 1 {
-            let first = 3 + (week % 6) + offset
-            let second = 2 + (week % 4)
-            return ("Solve \(first) + \(second). Show or draw how you counted.", "\(first + second)")
+    private func resources(
+        in subject: MEPSubject,
+        category: String,
+        overlapping lessonRange: ClosedRange<Int>
+    ) -> [MEPSubject.Resource] {
+        subject.resources.filter { resource in
+            guard resource.category == category,
+                  let range = numberRange(in: resource.title) else { return false }
+            return range.overlaps(lessonRange)
         }
-        if year == 2 {
-            let first = 20 + (week * 3 % 50) + offset
-            let second = 10 + (week * 2 % 25)
-            return ("Calculate \(first) + \(second). Show your place-value steps.", "\(first + second)")
-        }
-        if year <= 4 {
-            let first = 100 + week * 17 + offset
-            let second = 40 + week * 6
-            return ("Calculate \(first) − \(second). Show how you checked your answer.", "\(first - second)")
-        }
-        let factor = year + 3 + (week % 5) + offset
-        let multiplier = 6 + (week % 7)
-        return ("Calculate \(factor) × \(multiplier). Show a method that makes the calculation clear.", "\(factor * multiplier)")
     }
 
-    private func measurementProblem(year: Int, week: Int, offset: Int) -> (question: String, answer: String) {
-        if year == 1 {
-            let startingLength = 5 + (week % 5) + offset
-            let extra = 3 + (week % 4)
-            return ("A ribbon is \(startingLength) cm long. You add \(extra) cm. How long is it now?", "\(startingLength + extra) cm")
-        }
-        if year == 2 {
-            let pounds = 1 + (week % 4) + offset
-            let pence = 20 + (week * 5 % 70)
-            return ("A toy costs £\(pounds). You also spend \(pence)p. Write the total in pounds and pence.", "£\(pounds) and \(pence)p")
-        }
-        let metres = year == 3 ? 2 : (year == 4 ? 3 : (year == 5 ? 1 : 2))
-        let centimetres = (week % 4) * 10 + offset * 10
-        let total = metres * 100 + centimetres
-        return ("A path is \(metres) m and \(centimetres) cm long. How many centimetres is that altogether?", "\(total) cm")
+    private func subjectResourceAnswerKey(for workbook: MEPSubject.Resource, in subject: MEPSubject?) -> MEPSubject.Resource? {
+        guard let range = numberRange(in: workbook.title), let subject else { return nil }
+        return subject.resources.first { $0.category == "Answer keys" && numberRange(in: $0.title) == range }
     }
 
     private func resource(in subject: MEPSubject, category: String, covering lesson: Int) -> MEPSubject.Resource? {

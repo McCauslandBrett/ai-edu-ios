@@ -9,6 +9,7 @@ struct AssignmentWorkspaceView: View {
     @StateObject private var model: AssignmentWorkspaceModel
     @StateObject private var speech = AssignmentReadAloudController()
     @State private var drawing = PKDrawing()
+    @State private var sourcePageText = ""
     @State private var showingChangeRequest = false
 
     init(assignment: Assignment, dependencies: AssignmentWorkspaceDependencies = .live) {
@@ -20,17 +21,34 @@ struct AssignmentWorkspaceView: View {
             VStack(alignment: .leading, spacing: 20) {
                 assignmentHeader
                 workSection
-                AssignmentGradingPanel(
-                    assignment: model.assignment,
-                    grade: model.grade,
-                    gradingError: model.gradingError,
-                    retryError: model.retryError,
-                    retryAssignment: model.retryAssignment,
-                    isGrading: model.isGrading,
-                    isGeneratingRetry: model.isGeneratingRetry,
-                    onGrade: { Task { await model.gradeWork(student: profiles.selectedStudent, drawing: drawing, profiles: profiles) } },
-                    onRetry: { Task { await model.generateRetry(student: profiles.selectedStudent, profiles: profiles) } }
-                )
+                if let answerKeyURL = model.assignment.answerKeyResourceURL,
+                   model.assignment.resourcePageNumber != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Review with the official MEP answer key", systemImage: "checkmark.seal")
+                            .font(.headline)
+                        Text("This worksheet is the original Practice Book page. It has no AI-generated answer key; compare the student's work with CIMT's published answers.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        if let destination = URL(string: answerKeyURL) {
+                            Link(destination: destination) {
+                                Label("Open answer key · page \(model.assignment.printedPageNumber ?? 1)", systemImage: "arrow.up.right.square")
+                            }
+                        }
+                    }
+                    .padding(18)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 20))
+                } else {
+                    AssignmentGradingPanel(
+                        assignment: model.assignment,
+                        grade: model.grade,
+                        gradingError: model.gradingError,
+                        retryError: model.retryError,
+                        retryAssignment: model.retryAssignment,
+                        isGrading: model.isGrading,
+                        isGeneratingRetry: model.isGeneratingRetry,
+                        onGrade: { Task { await model.gradeWork(student: profiles.selectedStudent, drawing: drawing, profiles: profiles) } },
+                        onRetry: { Task { await model.generateRetry(student: profiles.selectedStudent, profiles: profiles) } }
+                    )
+                }
                 Label("AI grading is a suggestion. Review the result before using it to make learning decisions.", systemImage: "lock.shield")
                     .font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
             }
@@ -63,7 +81,12 @@ struct AssignmentWorkspaceView: View {
                 Spacer()
                 Text(documents.status(for: model.assignment.id)).font(.caption).foregroundStyle(.secondary)
             }
-            AssignmentWorksheetView(assignment: model.assignment, drawing: $drawing, speech: speech)
+            AssignmentWorksheetView(
+                assignment: model.assignment,
+                drawing: $drawing,
+                speech: speech,
+                sourcePageText: $sourcePageText
+            )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(.gray.opacity(0.25), lineWidth: 1))
         }
@@ -76,7 +99,10 @@ struct AssignmentWorkspaceView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.assignment.subject.uppercased()).font(.caption.weight(.bold)).tracking(1).foregroundStyle(.indigo)
             Text(model.assignment.title).font(.largeTitle.weight(.bold)).foregroundStyle(.primary)
-            Text("Due \(model.assignment.dueDate) · \(model.assignment.points) points").font(.subheadline).foregroundStyle(.secondary)
+            Text(model.assignment.points > 0
+                 ? "Due \(model.assignment.dueDate) · \(model.assignment.points) points"
+                 : "Due \(model.assignment.dueDate)")
+                .font(.subheadline).foregroundStyle(.secondary)
             HStack(alignment: .top, spacing: 12) {
                 Text(model.assignment.prompt).font(.body).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -95,6 +121,13 @@ struct AssignmentWorkspaceView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .padding(.top, 2)
+            }
+            if let answerKeyURL = model.assignment.answerKeyResourceURL,
+               let destination = URL(string: answerKeyURL) {
+                Link(destination: destination) {
+                    Label("Open official answer key", systemImage: "checkmark.seal")
+                        .font(.subheadline.weight(.semibold))
+                }
             }
             Button { showingChangeRequest = true } label: {
                 Label("Adjust this worksheet", systemImage: "slider.horizontal.3")

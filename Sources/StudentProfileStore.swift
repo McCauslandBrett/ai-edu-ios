@@ -17,10 +17,17 @@ final class StudentProfileStore: ObservableObject {
 
     init(persistence: any StudentProfilePersisting = StudentProfilePersistence()) {
         self.persistence = persistence
-        let initialStudents = persistence.loadStudents()
-        self.students = initialStudents
+        var initialStudents = persistence.loadStudents()
         let loadedSubjectPlans = persistence.loadSubjectPlans()
-        let migration = Self.migrateEmptyPrebuiltPlans(loadedSubjectPlans)
+        let migration = Self.migratePrebuiltPlans(loadedSubjectPlans)
+        for studentIndex in initialStudents.indices {
+            let studentID = initialStudents[studentIndex].id
+            guard let renamedSubjects = migration.subjectRenames[studentID] else { continue }
+            initialStudents[studentIndex].subjects = initialStudents[studentIndex].subjects.map { oldSubject in
+                renamedSubjects.first(where: { $0.key.caseInsensitiveCompare(oldSubject) == .orderedSame })?.value ?? oldSubject
+            }
+        }
+        self.students = initialStudents
         self.subjectPlans = migration.plans
         self.retryAssignments = persistence.loadRetryAssignments()
         self.activityEvents = persistence.loadActivityEvents()
@@ -230,68 +237,48 @@ final class StudentProfileStore: ObservableObject {
         )
     }
 
-    private static func migrateEmptyPrebuiltPlans(
+    private static func migratePrebuiltPlans(
         _ existingPlans: [String: StudentSubjectPlan]
-    ) -> (plans: [String: StudentSubjectPlan], didChange: Bool) {
+    ) -> (plans: [String: StudentSubjectPlan], subjectRenames: [String: [String: String]], didChange: Bool) {
         var plans = existingPlans
+        var subjectRenames: [String: [String: String]] = [:]
         var didChange = false
 
         for (key, existing) in existingPlans {
-            guard existing.plan.weeks.isEmpty,
+            guard (existing.prebuiltContentVersion ?? 0) < 4,
                   let prebuiltID = existing.prebuiltSubjectID,
                   let curriculum = MEPSubject.catalog.first(where: { $0.id == prebuiltID }) else {
                 continue
             }
 
             let generated = curriculum.makePlan(studentID: existing.studentID)
-            let inputs = SubjectPlanInputs(
-                targetedSkills: unique(existing.inputs.targetedSkills + generated.inputs.targetedSkills),
-                learningOutcome: existing.inputs.learningOutcome.isEmpty ? generated.inputs.learningOutcome : existing.inputs.learningOutcome,
-                highestAssessmentLevel: existing.inputs.highestAssessmentLevel,
-                priorAssessmentResults: existing.inputs.priorAssessmentResults,
-                instructorContext: existing.inputs.instructorContext.isEmpty ? generated.inputs.instructorContext : existing.inputs.instructorContext
-            )
             let plan = GeneratedLearningPlan(
                 subject: generated.plan.subject,
-                objective: existing.plan.objective.isEmpty ? generated.plan.objective : existing.plan.objective,
+                objective: generated.plan.objective,
                 monthlyWindow: generated.plan.monthlyWindow,
-                milestones: uniqueMilestones(existing.plan.milestones + generated.plan.milestones),
-                progress: mergeProgress(existing.plan.progress, with: generated.plan.progress),
+                milestones: generated.plan.milestones,
+                progress: existing.plan.progress.isEmpty ? generated.plan.progress : existing.plan.progress,
                 weeks: generated.plan.weeks
             )
-            plans[key] = StudentSubjectPlan(
+            let updated = StudentSubjectPlan(
                 studentID: existing.studentID,
-                subject: existing.subject,
-                inputs: inputs,
+                subject: generated.subject,
+                inputs: existing.inputs,
                 plan: plan,
                 prebuiltSubjectID: existing.prebuiltSubjectID,
+                prebuiltContentVersion: 4,
                 competencyResults: existing.competencyResults
             )
+            plans.removeValue(forKey: key)
+            plans[updated.id] = updated
+            if existing.subject.caseInsensitiveCompare(updated.subject) != .orderedSame {
+                subjectRenames[existing.studentID, default: [:]][existing.subject] = updated.subject
+            }
             didChange = true
         }
 
-        return (plans, didChange)
+        return (plans, subjectRenames, didChange)
     }
 
-    private static func unique(_ values: [String]) -> [String] {
-        var seen = Set<String>()
-        return values.filter { seen.insert($0).inserted }
-    }
-
-    private static func uniqueMilestones(_ values: [GeneratedLearningPlan.Milestone]) -> [GeneratedLearningPlan.Milestone] {
-        var seen = Set<String>()
-        return values.filter { seen.insert($0.id).inserted }
-    }
-
-    private static func mergeProgress(
-        _ existing: [GeneratedLearningPlan.Progress],
-        with generated: [GeneratedLearningPlan.Progress]
-    ) -> [GeneratedLearningPlan.Progress] {
-        let existingBySkill = Dictionary(existing.map { ($0.subject, $0) }, uniquingKeysWith: { first, _ in first })
-        var result = generated.map { skill in existingBySkill[skill.subject] ?? skill }
-        let generatedNames = Set(generated.map(\.subject))
-        result.append(contentsOf: existing.filter { !generatedNames.contains($0.subject) })
-        return result
-    }
 }
 
