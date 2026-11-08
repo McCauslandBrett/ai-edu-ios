@@ -26,7 +26,8 @@ struct SubjectPlanView: View {
                         student: student,
                         subject: subject,
                         week: week,
-                        trackedSkills: saved.plan.progress.map(\.subject)
+                        trackedSkills: saved.plan.progress.map(\.subject),
+                        fullYearWeekCount: saved.plan.monthlyWindow.hasPrefix("Full-year") ? saved.plan.weeks.count : nil
                     )
                 }
             } else {
@@ -86,6 +87,7 @@ private struct SubjectWeekSection: View {
     let subject: String
     let week: GeneratedLearningPlan.Week
     let trackedSkills: [String]
+    let fullYearWeekCount: Int?
     @State private var didCopyPrompt = false
     @State private var showingTutorChat = false
 
@@ -169,6 +171,11 @@ private struct SubjectWeekSection: View {
     }
 
     private var assessmentTitle: String {
+        if let fullYearWeekCount {
+            if week.weekNumber == 1 { return "Baseline assessment" }
+            if week.weekNumber == fullYearWeekCount { return "Year-end assessment" }
+            return "Week \(week.weekNumber) skills check"
+        }
         switch week.weekNumber {
         case 1: return "Baseline assessment"
         case 4: return "Final assessment"

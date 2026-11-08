@@ -64,7 +64,9 @@ final class AssignmentWorkspaceModel: ObservableObject {
             studentID: student.id,
             parentAssignmentID: assignment.parentAssignmentID,
             questionIllustrations: adjusted.questionIllustrations,
-            writingSpaceMultipliers: adjusted.writingSpaceMultipliers
+            writingSpaceMultipliers: adjusted.writingSpaceMultipliers,
+            resourceURL: assignment.resourceURL,
+            resourceTitle: assignment.resourceTitle
         )
         assignment = updated
         grade = nil

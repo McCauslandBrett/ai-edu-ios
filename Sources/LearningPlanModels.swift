@@ -38,6 +38,8 @@ struct GeneratedLearningPlan: Codable {
         var questionSkills: [String]? = nil
         var questionIllustrations: [String]? = nil
         var writingSpaceMultipliers: [Double]? = nil
+        var resourceURL: String? = nil
+        var resourceTitle: String? = nil
         let answerKey: [String]
         let rubric: String
         let points: Int
@@ -71,7 +73,9 @@ struct GeneratedLearningPlan: Codable {
                 questionSkills: linkedSkills,
                 studentID: studentID,
                 questionIllustrations: questionIllustrations,
-                writingSpaceMultipliers: writingSpaceMultipliers
+                writingSpaceMultipliers: writingSpaceMultipliers,
+                resourceURL: resourceURL,
+                resourceTitle: resourceTitle
             )
         }
     }

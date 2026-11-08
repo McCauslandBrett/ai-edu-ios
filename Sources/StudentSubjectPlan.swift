@@ -35,16 +35,7 @@ struct MEPSubject: Identifiable {
     let resources: [Resource]
 
     func makePlan(studentID: String) -> StudentSubjectPlan {
-        let objective = "Follow the MEP \(name) curriculum using its learning objectives, lesson plans, and practice books."
-        return StudentSubjectPlan(
-            studentID: studentID, subject: name,
-            inputs: SubjectPlanInputs(targetedSkills: [], learningOutcome: objective,
-                highestAssessmentLevel: "", priorAssessmentResults: [],
-                instructorContext: "CIMT Mathematics Enhancement Programme"),
-            plan: GeneratedLearningPlan(subject: name, objective: objective,
-                monthlyWindow: "Full-year curriculum · Work at your own pace",
-                milestones: [], progress: [], weeks: []),
-            prebuiltSubjectID: id)
+        MEPCurriculumPlanBuilder().build(subject: self, studentID: studentID)
     }
 
     static let catalog: [MEPSubject] = [

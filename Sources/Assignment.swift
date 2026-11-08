@@ -16,6 +16,8 @@ struct Assignment: Identifiable, Codable, Hashable {
     var parentAssignmentID: String? = nil
     var questionIllustrations: [String]? = nil
     var writingSpaceMultipliers: [Double]? = nil
+    var resourceURL: String? = nil
+    var resourceTitle: String? = nil
 
     var isHomework: Bool { status != "Assessment" }
 

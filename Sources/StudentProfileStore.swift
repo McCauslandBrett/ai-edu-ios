@@ -19,11 +19,23 @@ final class StudentProfileStore: ObservableObject {
         self.persistence = persistence
         let initialStudents = persistence.loadStudents()
         self.students = initialStudents
-        self.subjectPlans = persistence.loadSubjectPlans()
+        let loadedSubjectPlans = persistence.loadSubjectPlans()
+        let migration = Self.migrateEmptyPrebuiltPlans(loadedSubjectPlans)
+        self.subjectPlans = migration.plans
         self.retryAssignments = persistence.loadRetryAssignments()
         self.activityEvents = persistence.loadActivityEvents()
         self.assignmentOverrides = persistence.loadAssignmentOverrides()
         self.selectedStudentID = persistence.loadSelectedStudentID(fallback: initialStudents.first?.id ?? "student-1")
+
+        if migration.didChange {
+            persistence.save(
+                students: initialStudents,
+                subjectPlans: migration.plans,
+                retryAssignments: retryAssignments,
+                activityEvents: activityEvents,
+                assignmentOverrides: assignmentOverrides
+            )
+        }
     }
 
     var selectedStudent: StudentProfile {
@@ -216,6 +228,70 @@ final class StudentProfileStore: ObservableObject {
             activityEvents: activityEvents,
             assignmentOverrides: assignmentOverrides
         )
+    }
+
+    private static func migrateEmptyPrebuiltPlans(
+        _ existingPlans: [String: StudentSubjectPlan]
+    ) -> (plans: [String: StudentSubjectPlan], didChange: Bool) {
+        var plans = existingPlans
+        var didChange = false
+
+        for (key, existing) in existingPlans {
+            guard existing.plan.weeks.isEmpty,
+                  let prebuiltID = existing.prebuiltSubjectID,
+                  let curriculum = MEPSubject.catalog.first(where: { $0.id == prebuiltID }) else {
+                continue
+            }
+
+            let generated = curriculum.makePlan(studentID: existing.studentID)
+            let inputs = SubjectPlanInputs(
+                targetedSkills: unique(existing.inputs.targetedSkills + generated.inputs.targetedSkills),
+                learningOutcome: existing.inputs.learningOutcome.isEmpty ? generated.inputs.learningOutcome : existing.inputs.learningOutcome,
+                highestAssessmentLevel: existing.inputs.highestAssessmentLevel,
+                priorAssessmentResults: existing.inputs.priorAssessmentResults,
+                instructorContext: existing.inputs.instructorContext.isEmpty ? generated.inputs.instructorContext : existing.inputs.instructorContext
+            )
+            let plan = GeneratedLearningPlan(
+                subject: generated.plan.subject,
+                objective: existing.plan.objective.isEmpty ? generated.plan.objective : existing.plan.objective,
+                monthlyWindow: generated.plan.monthlyWindow,
+                milestones: uniqueMilestones(existing.plan.milestones + generated.plan.milestones),
+                progress: mergeProgress(existing.plan.progress, with: generated.plan.progress),
+                weeks: generated.plan.weeks
+            )
+            plans[key] = StudentSubjectPlan(
+                studentID: existing.studentID,
+                subject: existing.subject,
+                inputs: inputs,
+                plan: plan,
+                prebuiltSubjectID: existing.prebuiltSubjectID,
+                competencyResults: existing.competencyResults
+            )
+            didChange = true
+        }
+
+        return (plans, didChange)
+    }
+
+    private static func unique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
+    }
+
+    private static func uniqueMilestones(_ values: [GeneratedLearningPlan.Milestone]) -> [GeneratedLearningPlan.Milestone] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0.id).inserted }
+    }
+
+    private static func mergeProgress(
+        _ existing: [GeneratedLearningPlan.Progress],
+        with generated: [GeneratedLearningPlan.Progress]
+    ) -> [GeneratedLearningPlan.Progress] {
+        let existingBySkill = Dictionary(existing.map { ($0.subject, $0) }, uniquingKeysWith: { first, _ in first })
+        var result = generated.map { skill in existingBySkill[skill.subject] ?? skill }
+        let generatedNames = Set(generated.map(\.subject))
+        result.append(contentsOf: existing.filter { !generatedNames.contains($0.subject) })
+        return result
     }
 }
 

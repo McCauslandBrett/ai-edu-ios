@@ -88,6 +88,14 @@ struct AssignmentWorkspaceView: View {
                 )
             }
             .padding(.top, 4)
+            if let resourceURL = model.assignment.resourceURL,
+               let destination = URL(string: resourceURL) {
+                Link(destination: destination) {
+                    Label(model.assignment.resourceTitle ?? "Open MEP source material", systemImage: "arrow.up.right.square")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .padding(.top, 2)
+            }
             Button { showingChangeRequest = true } label: {
                 Label("Adjust this worksheet", systemImage: "slider.horizontal.3")
             }
