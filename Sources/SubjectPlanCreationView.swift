@@ -2,10 +2,12 @@ import SwiftUI
 
 struct SubjectPlanCreationView: View {
     @EnvironmentObject private var profiles: StudentProfileStore
+    @EnvironmentObject private var documents: AssignmentDocumentStore
     let student: StudentProfile
     let onCreate: (StudentSubjectPlan) -> Void
     let onClose: () -> Void
     private let planGenerator: any LearningPlanGenerating
+    private let gradeStore = AssignmentGradeStore()
 
     @State private var subject = ""
     @State private var targetedSkills = ""
@@ -80,7 +82,8 @@ struct SubjectPlanCreationView: View {
             ForEach(MEPSubject.catalog) { item in
                 NavigationLink {
                     MEPResourceView(subject: item) {
-                        profiles.addPrebuiltSubject(item, studentID: student.id)
+                        let staleAssignments = profiles.addPrebuiltSubject(item, studentID: student.id)
+                        removeStoredWork(for: staleAssignments)
                         onClose()
                     }
                 } label: {
@@ -195,6 +198,13 @@ struct SubjectPlanCreationView: View {
             instructorContext: instructorContext,
             previous: previous
         )
+    }
+
+    private func removeStoredWork(for assignments: [Assignment]) {
+        for assignment in assignments {
+            gradeStore.delete(assignmentID: assignment.id)
+            documents.deleteWork(for: assignment.id)
+        }
     }
 }
 

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct SubjectsTab: View {
     @EnvironmentObject private var profiles: StudentProfileStore
+    @EnvironmentObject private var documents: AssignmentDocumentStore
     @State private var showingSubjectForm = false
     @State private var subjectFormCloseRequested = false
     @State private var subjectPendingDeletion: String?
+    private let gradeStore = AssignmentGradeStore()
     let student: StudentProfile
 
     private var subjects: [String] {
@@ -44,13 +46,15 @@ struct SubjectsTab: View {
         ) {
             Button("Delete Subject", role: .destructive) {
                 if let subject = subjectPendingDeletion {
+                    let assignments = profiles.assignments(for: student, subject: subject)
+                    removeStoredWork(for: assignments)
                     profiles.deleteSubject(studentID: student.id, subject: subject)
                 }
                 subjectPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) { subjectPendingDeletion = nil }
         } message: {
-            Text("This removes the subject and its generated learning plan from this student's profile. Saved handwritten assignment work is kept.")
+            Text("This removes the subject, its assignments and activity, saved grades, and handwritten work for this student.")
         }
         .safeAreaInset(edge: .bottom) {
             Button {
@@ -93,6 +97,13 @@ struct SubjectsTab: View {
     private func closeSubjectForm() {
         subjectFormCloseRequested = true
         showingSubjectForm = false
+    }
+
+    private func removeStoredWork(for assignments: [Assignment]) {
+        for assignment in assignments {
+            gradeStore.delete(assignmentID: assignment.id)
+            documents.deleteWork(for: assignment.id)
+        }
     }
 
     private var deletionConfirmationPresented: Binding<Bool> {

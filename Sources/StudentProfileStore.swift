@@ -73,8 +73,19 @@ final class StudentProfileStore: ObservableObject {
 
     /// Adds a new prebuilt plan instance with its own subject name and activity identities.
     /// Selecting the same catalog item again therefore starts clean without changing earlier work.
-    func addPrebuiltSubject(_ curriculum: MEPSubject, studentID: String) {
-        guard students.contains(where: { $0.id == studentID }) else { return }
+    @discardableResult
+    func addPrebuiltSubject(_ curriculum: MEPSubject, studentID: String) -> [Assignment] {
+        guard students.contains(where: { $0.id == studentID }) else { return [] }
+        let hasActiveLegacyCopy = subjectPlans.values.contains {
+            $0.studentID == studentID && $0.prebuiltSubjectID == curriculum.id && $0.planInstanceID == nil
+        }
+        let legacyPlan = hasActiveLegacyCopy ? nil : curriculum.makePlan(studentID: studentID)
+        let staleLegacyAssignments = legacyPlan.map {
+            assignmentsToClean(for: $0)
+        } ?? []
+        if let legacyPlan {
+            removeAssignmentState(for: legacyPlan)
+        }
         let usedNames = Set(
             students.first(where: { $0.id == studentID })?.subjects.map(normalizedSubjectName) ?? []
         ).union(
@@ -89,6 +100,7 @@ final class StudentProfileStore: ObservableObject {
             subjectName: subjectName,
             planInstanceID: instanceID
         ))
+        return staleLegacyAssignments
     }
 
     private func uniqueSubjectName(for baseName: String, usedNames: Set<String>) -> String {
@@ -223,23 +235,67 @@ final class StudentProfileStore: ObservableObject {
         if let removedPlan = subjectPlans.removeValue(forKey: planKey) {
             removeAssignmentState(for: removedPlan)
         }
+        retryAssignments.removeAll {
+            $0.studentID == studentID && $0.subject.caseInsensitiveCompare(subject) == .orderedSame
+        }
+        activityEvents.removeAll {
+            $0.studentID == studentID && $0.subject.caseInsensitiveCompare(subject) == .orderedSame
+        }
+        assignmentOverrides = assignmentOverrides.filter { _, assignment in
+            assignment.studentID != studentID || assignment.subject.caseInsensitiveCompare(subject) != .orderedSame
+        }
         persist()
     }
 
     private func removeAssignmentState(for plan: StudentSubjectPlan) {
-        let assignmentIDs = Set(assignmentCatalog.assignments(from: plan).map(\.id))
+        let assignmentIDs = Set(assignmentsIncludingLegacyIDs(for: plan).map(\.id))
         guard !assignmentIDs.isEmpty else { return }
+        let subjectNames = historicalSubjectNames(for: plan)
         retryAssignments.removeAll { assignment in
             guard assignment.studentID == plan.studentID else { return false }
             return assignmentIDs.contains(assignment.id)
                 || assignment.parentAssignmentID.map(assignmentIDs.contains) == true
+                || subjectNames.contains(normalizedSubjectName(assignment.subject))
         }
         activityEvents.removeAll { event in
-            event.studentID == plan.studentID && event.assignmentID.map(assignmentIDs.contains) == true
+            guard event.studentID == plan.studentID else { return false }
+            return event.assignmentID.map(assignmentIDs.contains) == true
+                || subjectNames.contains(normalizedSubjectName(event.subject))
         }
         assignmentOverrides = assignmentOverrides.filter { _, assignment in
             assignment.studentID != plan.studentID || !assignmentIDs.contains(assignment.id)
         }
+    }
+
+    private func assignmentsIncludingLegacyIDs(for plan: StudentSubjectPlan) -> [Assignment] {
+        assignmentCatalog.assignments(from: plan).flatMap { assignment in
+            let legacyID = assignment.id.replacingOccurrences(of: "-mep-v3-y", with: "-mep-y")
+            guard legacyID != assignment.id else { return [assignment] }
+            return [assignment, assignment.reidentified(as: legacyID)]
+        }
+    }
+
+    private func assignmentsToClean(for plan: StudentSubjectPlan) -> [Assignment] {
+        var assignments = assignmentsIncludingLegacyIDs(for: plan)
+        let planIDs = Set(assignments.map(\.id))
+        assignments.append(contentsOf: retryAssignments.filter { assignment in
+            guard assignment.studentID == plan.studentID else { return false }
+            return planIDs.contains(assignment.id)
+                || assignment.parentAssignmentID.map(planIDs.contains) == true
+                || historicalSubjectNames(for: plan).contains(normalizedSubjectName(assignment.subject))
+        })
+        var addedIDs = Set<String>()
+        return assignments.filter { addedIDs.insert($0.id).inserted }
+    }
+
+    private func historicalSubjectNames(for plan: StudentSubjectPlan) -> Set<String> {
+        var names = [normalizedSubjectName(plan.subject)]
+        guard let prebuiltID = plan.prebuiltSubjectID else { return Set(names) }
+        let level = prebuiltID
+            .replacingOccurrences(of: "mep-year-", with: "")
+            .replacingOccurrences(of: "-math", with: "")
+        names.append(normalizedSubjectName("Year \(level) Math"))
+        return Set(names)
     }
 
     @discardableResult

@@ -3,8 +3,10 @@ import UIKit
 
 struct SubjectPlanView: View {
     @EnvironmentObject private var profiles: StudentProfileStore
+    @EnvironmentObject private var documents: AssignmentDocumentStore
     @Environment(\.dismiss) private var dismiss
     @State private var showingFreshCopyConfirmation = false
+    private let gradeStore = AssignmentGradeStore()
     let student: StudentProfile
     let subject: String
     let saved: StudentSubjectPlan?
@@ -52,7 +54,8 @@ struct SubjectPlanView: View {
         ) {
             Button("Add fresh copy") {
                 guard let prebuiltCurriculum else { return }
-                profiles.addPrebuiltSubject(prebuiltCurriculum, studentID: student.id)
+                let staleAssignments = profiles.addPrebuiltSubject(prebuiltCurriculum, studentID: student.id)
+                removeStoredWork(for: staleAssignments)
                 dismiss()
             }
             Button("Cancel", role: .cancel) {}
@@ -64,6 +67,13 @@ struct SubjectPlanView: View {
     private var prebuiltCurriculum: MEPSubject? {
         guard let id = saved?.prebuiltSubjectID else { return nil }
         return MEPSubject.catalog.first { $0.id == id }
+    }
+
+    private func removeStoredWork(for assignments: [Assignment]) {
+        for assignment in assignments {
+            gradeStore.delete(assignmentID: assignment.id)
+            documents.deleteWork(for: assignment.id)
+        }
     }
 }
 
