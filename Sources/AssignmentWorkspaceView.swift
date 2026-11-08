@@ -7,6 +7,7 @@ struct AssignmentWorkspaceView: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model: AssignmentWorkspaceModel
+    @StateObject private var speech = AssignmentReadAloudController()
     @State private var drawing = PKDrawing()
     @State private var showingChangeRequest = false
 
@@ -46,6 +47,7 @@ struct AssignmentWorkspaceView: View {
         .navigationTitle(model.assignment.title)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { restoreWorkspace() }
+        .onDisappear { speech.stop() }
         .onChange(of: drawing) { _, newDrawing in
             documents.updateDrawing(newDrawing, for: model.assignment.id)
         }
@@ -61,7 +63,7 @@ struct AssignmentWorkspaceView: View {
                 Spacer()
                 Text(documents.status(for: model.assignment.id)).font(.caption).foregroundStyle(.secondary)
             }
-            AssignmentWorksheetView(assignment: model.assignment, drawing: $drawing)
+            AssignmentWorksheetView(assignment: model.assignment, drawing: $drawing, speech: speech)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(.gray.opacity(0.25), lineWidth: 1))
         }
@@ -75,7 +77,17 @@ struct AssignmentWorkspaceView: View {
             Text(model.assignment.subject.uppercased()).font(.caption.weight(.bold)).tracking(1).foregroundStyle(.indigo)
             Text(model.assignment.title).font(.largeTitle.weight(.bold)).foregroundStyle(.primary)
             Text("Due \(model.assignment.dueDate) · \(model.assignment.points) points").font(.subheadline).foregroundStyle(.secondary)
-            Text(model.assignment.prompt).font(.body).foregroundStyle(.primary).padding(.top, 4)
+            HStack(alignment: .top, spacing: 12) {
+                Text(model.assignment.prompt).font(.body).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                AssignmentReadAloudButton(
+                    text: model.assignment.prompt,
+                    id: "assignment-description",
+                    speech: speech
+                )
+            }
+            .padding(.top, 4)
             Button { showingChangeRequest = true } label: {
                 Label("Adjust this worksheet", systemImage: "slider.horizontal.3")
             }

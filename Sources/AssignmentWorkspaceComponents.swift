@@ -5,6 +5,7 @@ import PencilKit
 struct AssignmentWorksheetView: View {
     let assignment: Assignment
     @Binding var drawing: PKDrawing
+    @ObservedObject var speech: AssignmentReadAloudController
 
     private let exercisesPerPage = 4
     private let standardExerciseHeight: CGFloat = 220
@@ -49,8 +50,17 @@ struct AssignmentWorksheetView: View {
                visuals.indices.contains(index), !visuals[index].isEmpty {
                 Text(visuals[index]).font(.system(size: 34)).accessibilityLabel("Exercise illustration")
             }
-            Text(question).font(.body.weight(.medium)).foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 12) {
+                Text(question).font(.body.weight(.medium)).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                AssignmentReadAloudButton(
+                    text: question,
+                    id: "question-\(index)",
+                    speech: speech,
+                    shortLabel: true
+                )
+            }
             Rectangle().fill(Color.indigo.opacity(0.16)).frame(height: 1)
             Spacer(minLength: 0)
         }
@@ -71,6 +81,37 @@ struct AssignmentWorksheetView: View {
         let multipliers = assignment.writingSpaceMultipliers ?? []
         let value = multipliers.indices.contains(index) ? multipliers[index] : 1
         return standardExerciseHeight * CGFloat(min(3, max(1, value)))
+    }
+}
+
+struct AssignmentReadAloudButton: View {
+    let text: String
+    let id: String
+    @ObservedObject var speech: AssignmentReadAloudController
+    var shortLabel = false
+
+    private var isSpeaking: Bool { speech.speakingID == id }
+
+    var body: some View {
+        Button {
+            speech.toggle(text, id: id)
+        } label: {
+            Group {
+                if shortLabel {
+                    Label(isSpeaking ? "Stop" : "Listen", systemImage: isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                        .labelStyle(.iconOnly)
+                } else {
+                    Label(isSpeaking ? "Stop reading" : "Read aloud", systemImage: isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, shortLabel ? 10 : 12)
+            .padding(.vertical, 8)
+            .background(Color.indigo.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSpeaking ? "Stop reading" : "Read aloud")
     }
 }
 

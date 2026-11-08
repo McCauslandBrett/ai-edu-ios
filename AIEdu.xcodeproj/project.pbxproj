@@ -47,6 +47,7 @@
 		100000000000000000000082 /* TutorChatSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000083 /* TutorChatSessionModel.swift */; };
 		100000000000000000000084 /* TutorWhiteboardSnapshotEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000085 /* TutorWhiteboardSnapshotEncoder.swift */; };
 		100000000000000000000086 /* StudentAssignmentCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000087 /* StudentAssignmentCatalog.swift */; };
+		100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000089 /* AssignmentReadAloudController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -91,6 +92,7 @@
 		100000000000000000000083 /* TutorChatSessionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorChatSessionModel.swift; sourceTree = "<group>"; };
 		100000000000000000000085 /* TutorWhiteboardSnapshotEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorWhiteboardSnapshotEncoder.swift; sourceTree = "<group>"; };
 		100000000000000000000087 /* StudentAssignmentCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentAssignmentCatalog.swift; sourceTree = "<group>"; };
+		100000000000000000000089 /* AssignmentReadAloudController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentReadAloudController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +164,7 @@
 				100000000000000000000083 /* TutorChatSessionModel.swift */,
 				100000000000000000000085 /* TutorWhiteboardSnapshotEncoder.swift */,
 				100000000000000000000087 /* StudentAssignmentCatalog.swift */,
+				100000000000000000000089 /* AssignmentReadAloudController.swift */,
 				100000000000000000000075 /* Assets.xcassets */,
 			);
 			path = Sources;
@@ -269,6 +272,7 @@
 				100000000000000000000082 /* TutorChatSessionModel.swift in Sources */,
 				100000000000000000000084 /* TutorWhiteboardSnapshotEncoder.swift in Sources */,
 				100000000000000000000086 /* StudentAssignmentCatalog.swift in Sources */,
+				100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
