@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 struct SubjectPlanView: View {
+    @EnvironmentObject private var profiles: StudentProfileStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingFreshCopyConfirmation = false
     let student: StudentProfile
     let subject: String
     let saved: StudentSubjectPlan?
@@ -15,6 +18,11 @@ struct SubjectPlanView: View {
                 Section("MEP curriculum") {
                     NavigationLink("Open workbooks and teaching materials") {
                         MEPResourceView(subject: curriculum, onAdd: nil)
+                    }
+                    Button {
+                        showingFreshCopyConfirmation = true
+                    } label: {
+                        Label("Start a fresh copy", systemImage: "arrow.counterclockwise")
                     }
                 }
             }
@@ -37,6 +45,20 @@ struct SubjectPlanView: View {
         }
         .navigationTitle(subject)
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            "Start a fresh copy of this plan?",
+            isPresented: $showingFreshCopyConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Add fresh copy") {
+                guard let prebuiltCurriculum else { return }
+                profiles.addPrebuiltSubject(prebuiltCurriculum, studentID: student.id)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A new subject entry will be added with all assignments and progress reset. This copy and its saved work will stay unchanged.")
+        }
     }
 
     private var prebuiltCurriculum: MEPSubject? {

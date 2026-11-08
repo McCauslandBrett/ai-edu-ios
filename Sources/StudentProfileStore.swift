@@ -71,6 +71,39 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    /// Adds a new prebuilt plan instance with its own subject name and activity identities.
+    /// Selecting the same catalog item again therefore starts clean without changing earlier work.
+    func addPrebuiltSubject(_ curriculum: MEPSubject, studentID: String) {
+        guard students.contains(where: { $0.id == studentID }) else { return }
+        let usedNames = Set(
+            students.first(where: { $0.id == studentID })?.subjects.map(normalizedSubjectName) ?? []
+        ).union(
+            subjectPlans.values
+                .filter { $0.studentID == studentID }
+                .map { normalizedSubjectName($0.subject) }
+        )
+        let subjectName = uniqueSubjectName(for: curriculum.name, usedNames: usedNames)
+        let instanceID = UUID().uuidString.lowercased()
+        saveSubjectPlan(curriculum.makePlan(
+            studentID: studentID,
+            subjectName: subjectName,
+            planInstanceID: instanceID
+        ))
+    }
+
+    private func uniqueSubjectName(for baseName: String, usedNames: Set<String>) -> String {
+        guard usedNames.contains(normalizedSubjectName(baseName)) else { return baseName }
+        var copyNumber = 2
+        while usedNames.contains(normalizedSubjectName("\(baseName) (\(copyNumber))")) {
+            copyNumber += 1
+        }
+        return "\(baseName) (\(copyNumber))"
+    }
+
+    private func normalizedSubjectName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     func saveAssignmentOverride(_ assignment: Assignment, studentID: String) {
         var studentAssignment = assignment
         studentAssignment.studentID = studentID
@@ -186,8 +219,27 @@ final class StudentProfileStore: ObservableObject {
     func deleteSubject(studentID: String, subject: String) {
         guard let studentIndex = students.firstIndex(where: { $0.id == studentID }) else { return }
         students[studentIndex].subjects.removeAll { $0.caseInsensitiveCompare(subject) == .orderedSame }
-        subjectPlans.removeValue(forKey: StudentSubjectPlan.key(studentID: studentID, subject: subject))
+        let planKey = StudentSubjectPlan.key(studentID: studentID, subject: subject)
+        if let removedPlan = subjectPlans.removeValue(forKey: planKey) {
+            removeAssignmentState(for: removedPlan)
+        }
         persist()
+    }
+
+    private func removeAssignmentState(for plan: StudentSubjectPlan) {
+        let assignmentIDs = Set(assignmentCatalog.assignments(from: plan).map(\.id))
+        guard !assignmentIDs.isEmpty else { return }
+        retryAssignments.removeAll { assignment in
+            guard assignment.studentID == plan.studentID else { return false }
+            return assignmentIDs.contains(assignment.id)
+                || assignment.parentAssignmentID.map(assignmentIDs.contains) == true
+        }
+        activityEvents.removeAll { event in
+            event.studentID == plan.studentID && event.assignmentID.map(assignmentIDs.contains) == true
+        }
+        assignmentOverrides = assignmentOverrides.filter { _, assignment in
+            assignment.studentID != plan.studentID || !assignmentIDs.contains(assignment.id)
+        }
     }
 
     @discardableResult
@@ -270,7 +322,11 @@ final class StudentProfileStore: ObservableObject {
                 continue
             }
 
-            let generated = curriculum.makePlan(studentID: existing.studentID)
+            let generated = curriculum.makePlan(
+                studentID: existing.studentID,
+                subjectName: existing.subject,
+                planInstanceID: existing.planInstanceID
+            )
             let plan = GeneratedLearningPlan(
                 subject: generated.plan.subject,
                 objective: generated.plan.objective,
@@ -286,6 +342,7 @@ final class StudentProfileStore: ObservableObject {
                 plan: plan,
                 prebuiltSubjectID: existing.prebuiltSubjectID,
                 prebuiltContentVersion: 4,
+                planInstanceID: existing.planInstanceID,
                 competencyResults: existing.competencyResults
             )
             plans.removeValue(forKey: key)

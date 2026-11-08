@@ -15,6 +15,7 @@ struct StudentSubjectPlan: Codable, Identifiable {
     var plan: GeneratedLearningPlan
     var prebuiltSubjectID: String? = nil
     var prebuiltContentVersion: Int? = nil
+    var planInstanceID: String? = nil
     var competencyResults: [String: [Bool]]? = nil
 
     var id: String { Self.key(studentID: studentID, subject: subject) }
@@ -35,8 +36,17 @@ struct MEPSubject: Identifiable {
     let name: String
     let resources: [Resource]
 
-    func makePlan(studentID: String) -> StudentSubjectPlan {
-        MEPCurriculumPlanBuilder().build(subject: self, studentID: studentID)
+    func makePlan(
+        studentID: String,
+        subjectName: String? = nil,
+        planInstanceID: String? = nil
+    ) -> StudentSubjectPlan {
+        let namedSubject = MEPSubject(id: id, name: subjectName ?? name, resources: resources)
+        return MEPCurriculumPlanBuilder().build(
+            subject: namedSubject,
+            studentID: studentID,
+            planInstanceID: planInstanceID
+        )
     }
 
     static let catalog: [MEPSubject] = [

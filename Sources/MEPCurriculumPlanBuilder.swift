@@ -20,13 +20,19 @@ struct MEPCurriculumPlanBuilder {
         return "Compressed month plan · MEP lessons \(lessons.lowerBound)–\(lessons.upperBound). This week uses original Practice Book pages \(pages.map(String.init).joined(separator: ", ")); each page includes its printed exercises, diagrams, and response areas."
     }
 
-    func build(subject: MEPSubject, studentID: String) -> StudentSubjectPlan {
+    func build(subject: MEPSubject, studentID: String, planInstanceID: String? = nil) -> StudentSubjectPlan {
         let year = yearNumber(in: subject)
         let lessonCount = year == 6 ? 175 : 140
         let weekCount = weeksPerCourse
         let objective = "Complete a four-week accelerated survey of MEP Math Level \(year). Each week covers about one quarter of the level and uses four original Practice Book pages spaced across that material."
         let weeks = (1...weekCount).map { weekNumber in
-            makeWeek(weekNumber, year: year, lessonCount: lessonCount, subject: subject)
+            makeWeek(
+                weekNumber,
+                year: year,
+                lessonCount: lessonCount,
+                subject: subject,
+                planInstanceID: planInstanceID
+            )
         }
         let milestones = weeks.flatMap { week in
             let assignments = week.assignments.map { assignment in
@@ -39,7 +45,7 @@ struct MEPCurriculumPlanBuilder {
             }
             return assignments + [
                 GeneratedLearningPlan.Milestone(
-                    id: "mep-week-\(week.weekNumber)-assessment",
+                    id: "mep-week-\(week.weekNumber)-assessment\(planInstanceID.map { "-\($0)" } ?? "")",
                     title: week.assessment.title,
                     date: "Week \(week.weekNumber)",
                     kind: week.weekNumber == weekCount ? "final" : "assessment"
@@ -74,7 +80,8 @@ struct MEPCurriculumPlanBuilder {
             ),
             plan: plan,
             prebuiltSubjectID: subject.id,
-            prebuiltContentVersion: 4
+            prebuiltContentVersion: 4,
+            planInstanceID: planInstanceID
         )
     }
 
@@ -82,7 +89,8 @@ struct MEPCurriculumPlanBuilder {
         _ weekNumber: Int,
         year: Int,
         lessonCount: Int,
-        subject: MEPSubject
+        subject: MEPSubject,
+        planInstanceID: String?
     ) -> GeneratedLearningPlan.Week {
         let lessonRange = lessonRange(for: weekNumber, lessonCount: lessonCount)
         let firstLesson = lessonRange.lowerBound
@@ -108,7 +116,8 @@ struct MEPCurriculumPlanBuilder {
                 assignmentNumber: offset + 1,
                 pageNumber: pageNumber,
                 assessment: false,
-                resource: workbook
+                resource: workbook,
+                planInstanceID: planInstanceID
             )
         }
         let assessmentPage = lastLesson
@@ -120,7 +129,8 @@ struct MEPCurriculumPlanBuilder {
             assignmentNumber: 0,
             pageNumber: assessmentPage,
             assessment: true,
-            resource: assessmentWorkbook
+            resource: assessmentWorkbook,
+            planInstanceID: planInstanceID
         )
 
         // Link every lesson-plan segment crossed by this accelerated week's lesson range.
@@ -264,7 +274,8 @@ struct MEPCurriculumPlanBuilder {
         assignmentNumber: Int,
         pageNumber: Int,
         assessment: Bool,
-        resource: MEPSubject.Resource?
+        resource: MEPSubject.Resource?,
+        planInstanceID: String?
     ) -> GeneratedLearningPlan.PlannedActivity {
         let label = assessment ? "Weekly Practice Book check" : "Practice Book page \(pageNumber)"
         let localPage = resource.flatMap { numberRange(in: $0.title)?.lowerBound }.map { pageNumber - $0 + 1 }
@@ -272,7 +283,7 @@ struct MEPCurriculumPlanBuilder {
             subjectResourceAnswerKey(for: workbook, in: MEPSubject.catalog.first { $0.id == "mep-year-\(year)-math" })
         }
         return GeneratedLearningPlan.PlannedActivity(
-            id: "mep-v3-y\(year)-w\(weekNumber)-\(assessment ? "check" : "practice-\(assignmentNumber)")",
+            id: "mep-v3-y\(year)-w\(weekNumber)-\(assessment ? "check" : "practice-\(assignmentNumber)")\(planInstanceID.map { "-copy-\($0)" } ?? "")",
             title: "\(label) · Lesson \(pageNumber)",
             subject: subjectName,
             prompt: assessment

@@ -80,7 +80,7 @@ struct SubjectPlanCreationView: View {
             ForEach(MEPSubject.catalog) { item in
                 NavigationLink {
                     MEPResourceView(subject: item) {
-                        onCreate(item.makePlan(studentID: student.id))
+                        profiles.addPrebuiltSubject(item, studentID: student.id)
                         onClose()
                     }
                 } label: {
@@ -93,7 +93,7 @@ struct SubjectPlanCreationView: View {
         } header: {
             Text("Choose a prebuilt subject")
         } footer: {
-            Text("Ready-to-use MEP curriculum with workbooks, objectives, lesson plans, and teaching materials. Or create a custom subject below.")
+            Text("Each selection adds a separate MEP plan copy with fresh progress. You can add the same level again any time to start over. Or create a custom subject below.")
         }
         .disabled(isGenerating)
     }
