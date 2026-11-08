@@ -52,6 +52,8 @@ struct StudentActivityEvent: Identifiable, Codable, Hashable {
     let questionCount: Int
     let passed: Bool?
     let completionNote: String?
+    var assignmentID: String? = nil
+    var manuallyCompleted: Bool? = nil
 
     init(studentID: String, assignment: Assignment, grade: AssignmentGrade, recordedAt: Date = .now) {
         id = UUID().uuidString
@@ -60,12 +62,30 @@ struct StudentActivityEvent: Identifiable, Codable, Hashable {
         title = assignment.title
         subject = assignment.subject
         self.recordedAt = recordedAt
+        assignmentID = assignment.id
         score = grade.score
         total = grade.total
         correctQuestions = grade.correctCount
         questionCount = grade.questionCount
         passed = assignment.isHomework ? grade.isPassing : nil
         completionNote = nil
+    }
+
+    init(studentID: String, completedAssignment assignment: Assignment, recordedAt: Date = .now) {
+        id = UUID().uuidString
+        self.studentID = studentID
+        kind = assignment.isHomework ? .assignment : .assessment
+        title = assignment.title
+        subject = assignment.subject
+        self.recordedAt = recordedAt
+        score = 0
+        total = 0
+        correctQuestions = 0
+        questionCount = 0
+        passed = nil
+        completionNote = "Marked complete"
+        assignmentID = assignment.id
+        manuallyCompleted = true
     }
 
     init(

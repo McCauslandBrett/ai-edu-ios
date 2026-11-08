@@ -16,14 +16,15 @@ struct AssignmentListTab: View {
                     ContentUnavailableView("No assignments yet", systemImage: "doc.text", description: Text("Assignments for this student's subjects will appear here."))
                 }
                 ForEach(assignments) { assignment in
+                    let complete = profiles.isAssignmentComplete(assignment, studentID: student.id)
                     NavigationLink {
                         AssignmentWorkspaceView(assignment: assignment)
                     } label: {
                         HStack(spacing: 14) {
                             Image(systemName: "doc.text")
-                                .font(.title2).foregroundStyle(.indigo)
+                                .font(.title2).foregroundStyle(complete ? Color.green : Color.indigo)
                                 .frame(width: 44, height: 44)
-                                .background(.indigo.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                                .background((complete ? Color.green : Color.indigo).opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(assignment.subject.uppercased()).font(.caption.weight(.bold)).foregroundStyle(.secondary)
                                 Text(assignment.title).font(.headline)
@@ -42,6 +43,7 @@ struct AssignmentListTab: View {
     }
 
     private func status(for assignment: Assignment) -> String {
+        if profiles.isAssignmentComplete(assignment, studentID: student.id) { return "Complete" }
         guard let grade = gradeStore.load(assignmentID: assignment.id), assignment.isHomework else {
             return assignment.status
         }
@@ -49,6 +51,7 @@ struct AssignmentListTab: View {
     }
 
     private func statusColor(for assignment: Assignment) -> Color {
+        if profiles.isAssignmentComplete(assignment, studentID: student.id) { return .green }
         guard let grade = gradeStore.load(assignmentID: assignment.id), assignment.isHomework else {
             return .orange
         }

@@ -31,6 +31,7 @@ struct DashboardTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 studentOverview
+                assignmentCompletionSection
                 progressSection
                 nextMilestoneSection
                 DashboardActivitySection(events: profiles.activity(for: student.id))
@@ -79,10 +80,41 @@ struct DashboardTab: View {
         )
     }
 
+    private var assignmentCompletionSection: some View {
+        let assignments = profiles.assignments(for: student)
+        let completed = assignments.filter { profiles.isAssignmentComplete($0, studentID: student.id) }.count
+        let subjects = Array(Set(assignments.map(\.subject))).sorted()
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Assignment completion").font(.title2.bold())
+            Text("\(completed) of \(assignments.count) complete")
+                .font(.headline).foregroundStyle(.indigo)
+            Text("Use Mark complete at the bottom of an assignment. Skill progress below reflects graded answers.")
+                .font(.caption).foregroundStyle(.secondary)
+            if assignments.isEmpty {
+                Text("Add a subject to start tracking assignments.").foregroundStyle(.secondary)
+            }
+            ForEach(subjects, id: \.self) { subject in
+                let work = assignments.filter { $0.subject == subject }
+                let done = work.filter { profiles.isAssignmentComplete($0, studentID: student.id) }.count
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(subject).font(.headline)
+                    ProgressView(value: Double(done), total: Double(max(work.count, 1)))
+                        .tint(.green)
+                        .accessibilityLabel("\(subject) assignment completion")
+                        .accessibilityValue("\(done) of \(work.count) complete")
+                    Text("\(done) of \(work.count) complete · \(Int(Double(done) / Double(max(work.count, 1)) * 100))%")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(18)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+    }
+
     private var progressSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Subject progress").font(.title2.bold())
+                Text("Skill progress").font(.title2.bold())
                 Spacer()
                 if let plan = savedPlans.first?.plan {
                     Text(plan.monthlyWindow).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
@@ -178,10 +210,14 @@ private struct DashboardActivitySection: View {
         }
     }
 
+    private func weeklyWorkCount(_ kind: StudentActivityEvent.Kind) -> Int {
+        Set(thisWeek.filter { $0.kind == kind }.map { $0.assignmentID ?? $0.id }).count
+    }
+
     private var weeklyCounts: some View {
         HStack(spacing: 12) {
-            ActivityCountCard(title: "Assignments this week", count: thisWeek.filter { $0.kind == .assignment }.count)
-            ActivityCountCard(title: "Assessments this week", count: thisWeek.filter { $0.kind == .assessment }.count)
+            ActivityCountCard(title: "Assignments this week", count: weeklyWorkCount(.assignment))
+            ActivityCountCard(title: "Assessments this week", count: weeklyWorkCount(.assessment))
             ActivityCountCard(title: "Tutor sessions this week", count: thisWeek.filter { $0.kind == .tutorSession }.count)
         }
     }
@@ -192,7 +228,7 @@ private struct DashboardActivitySection: View {
             ContentUnavailableView(
                 "No activity recorded yet",
                 systemImage: "checklist",
-                description: Text("Grading completed work records its submission date here.")
+                description: Text("Mark an assignment complete or grade work to record activity here.")
             )
             .frame(minHeight: 140)
         } else {
@@ -239,6 +275,9 @@ private struct ActivityEventRow: View {
     let event: StudentActivityEvent
 
     private var headline: String {
+        if event.manuallyCompleted == true {
+            return event.kind == .assessment ? "Assessment completed" : "Assignment completed"
+        }
         switch event.kind {
         case .assessment: return "Assessment taken"
         case .assignment: return "Assignment submitted"
@@ -247,6 +286,7 @@ private struct ActivityEventRow: View {
     }
 
     private var resultText: String {
+        if event.manuallyCompleted == true { return "Marked complete · Grading tracked separately" }
         if event.kind == .tutorSession {
             return event.completionNote ?? "Lesson finished"
         } else if event.kind == .assessment {
@@ -257,6 +297,7 @@ private struct ActivityEventRow: View {
     }
 
     private var resultColor: Color {
+        if event.manuallyCompleted == true { return .green }
         switch event.kind {
         case .assessment: return .indigo
         case .assignment: return event.passed == true ? .green : .orange

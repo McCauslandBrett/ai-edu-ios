@@ -88,6 +88,7 @@ private struct TrackedSkillsSection: View {
 }
 
 private struct SubjectWeekSection: View {
+    @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let subject: String
     let week: GeneratedLearningPlan.Week
@@ -122,27 +123,14 @@ private struct SubjectWeekSection: View {
                 }
                 Text(week.lecturePrompt).font(.subheadline)
                 if !weeklyVideos.isEmpty {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Label("Weekly videos", systemImage: "play.rectangle.fill")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                         ForEach(weeklyVideos, id: \.url) { video in
-                            if let destination = video.destination {
-                                Link(destination: destination) {
-                                    Label(video.title, systemImage: "play.fill")
-                                        .font(.subheadline.weight(.semibold))
-                                        .multilineTextAlignment(.leading)
-                                }
-                                Text("\(video.channel) · \(video.reason)")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if video.url != weeklyVideos.last?.url {
-                                    Divider()
-                                }
-                            }
+                            VisitedVideoLink(video: video, studentID: student.id)
                         }
                     }
-                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                 }
                 Button {
                     showingTutorChat = true
@@ -162,31 +150,37 @@ private struct SubjectWeekSection: View {
                 )
             }
 
+            let assessment = week.assessment.makeAssignment(
+                studentID: student.id, subject: subject, weekNumber: week.weekNumber,
+                assessment: true, trackedSkills: trackedSkills)
             NavigationLink {
-                AssignmentWorkspaceView(assignment: week.assessment.makeAssignment(
-                    studentID: student.id,
-                    subject: subject,
-                    weekNumber: week.weekNumber,
-                    assessment: true,
-                    trackedSkills: trackedSkills
-                ))
+                AssignmentWorkspaceView(assignment: assessment)
             } label: {
-                Label(assessmentTitle, systemImage: "checkmark.seal").foregroundStyle(.orange)
+                assignmentLabel(assessmentTitle, assignment: assessment, assessment: true)
             }
 
             ForEach(week.assignments) { activity in
+                let assignment = activity.makeAssignment(
+                    studentID: student.id, subject: subject, weekNumber: week.weekNumber,
+                    trackedSkills: trackedSkills)
                 NavigationLink {
-                    AssignmentWorkspaceView(assignment: activity.makeAssignment(
-                        studentID: student.id,
-                        subject: subject,
-                        weekNumber: week.weekNumber,
-                        trackedSkills: trackedSkills
-                    ))
+                    AssignmentWorkspaceView(assignment: assignment)
                 } label: {
-                    Label(activity.title, systemImage: "doc.text")
+                    assignmentLabel(activity.title, assignment: assignment)
                 }
             }
         }
+    }
+
+    private func assignmentLabel(_ title: String, assignment: Assignment, assessment: Bool = false) -> some View {
+        let complete = profiles.isAssignmentComplete(assignment, studentID: student.id)
+        return Label {
+            Text(title).foregroundStyle(assessment ? Color.orange : Color.primary)
+        } icon: {
+            Image(systemName: assessment ? "checkmark.seal" : "doc.text")
+                .foregroundStyle(complete ? Color.green : (assessment ? Color.orange : Color.indigo))
+        }
+        .accessibilityValue(complete ? "Complete" : "Not complete")
     }
 
     private var weekOverview: String {
@@ -233,6 +227,7 @@ private struct PlanTemplateSection: View {
 }
 
 private struct SubjectAssignmentsSection: View {
+    @EnvironmentObject private var profiles: StudentProfileStore
     let subject: String
     let assignments: [Assignment]
 
@@ -251,6 +246,9 @@ private struct SubjectAssignmentsSection: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(assignment.title).font(.headline)
+                        if profiles.isAssignmentComplete(assignment, studentID: assignment.studentID ?? profiles.selectedStudent.id) {
+                            Label("Complete", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green)
+                        }
                         Text("\(assignment.dueDate) · \(assignment.points) points")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -301,5 +299,50 @@ struct MEPResourceView: View {
         }
         .navigationTitle(subject.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// A successful link open marks the URL visited for this student, including in other weeks.
+private struct VisitedVideoLink: View {
+    @Environment(\.openURL) private var openURL
+    @AppStorage private var visited: Bool
+    let video: GeneratedLearningPlan.SuggestedVideo
+
+    init(video: GeneratedLearningPlan.SuggestedVideo, studentID: String) {
+        self.video = video
+        _visited = AppStorage(wrappedValue: false, "visited-video::\(studentID)::\(video.url)")
+    }
+
+    var body: some View {
+        if let destination = video.destination {
+            Button {
+                openURL(destination) { accepted in
+                    if accepted { visited = true }
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Label(video.title, systemImage: "play.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 8)
+                        if visited {
+                            Label("Visited", systemImage: "checkmark.circle.fill")
+                                .font(.caption).foregroundStyle(.green)
+                        }
+                    }
+                    Text("\(video.channel) · \(video.reason)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background((visited ? Color.green : Color.red).opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 12))
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.indigo)
+            .accessibilityValue(visited ? "Visited" : "Not visited")
+        }
     }
 }

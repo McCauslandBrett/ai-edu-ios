@@ -49,6 +49,7 @@ struct AssignmentWorkspaceView: View {
                         onRetry: { Task { await model.generateRetry(student: profiles.selectedStudent, profiles: profiles) } }
                     )
                 }
+                completionSection
                 Label("AI grading is a suggestion. Review the result before using it to make learning decisions.", systemImage: "lock.shield")
                     .font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
             }
@@ -72,6 +73,37 @@ struct AssignmentWorkspaceView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { documents.flushSave(for: model.assignment.id) }
         }
+    }
+
+    private var assignmentStudentID: String {
+        model.assignment.studentID ?? profiles.selectedStudent.id
+    }
+
+    private var completionSection: some View {
+        let complete = profiles.isAssignmentComplete(model.assignment, studentID: assignmentStudentID)
+        return VStack(alignment: .leading, spacing: 12) {
+            Label(complete ? "Assignment complete" : "Finished this assignment?",
+                  systemImage: complete ? "checkmark.circle.fill" : "circle")
+                .font(.headline)
+                .foregroundStyle(complete ? .green : .primary)
+            Text(complete
+                 ? "Saved to your dashboard. You can reopen this assignment below."
+                 : "Mark your work complete to update your dashboard. Grading is optional and tracked separately.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Button {
+                documents.flushSave(for: model.assignment.id)
+                profiles.setAssignmentComplete(!complete, for: model.assignment, studentID: assignmentStudentID)
+            } label: {
+                Label(complete ? "Mark incomplete" : "Mark complete",
+                      systemImage: complete ? "arrow.uturn.backward" : "checkmark.circle")
+                    .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(complete ? .gray : .indigo)
+            .disabled(model.isGrading || model.isGeneratingRetry)
+        }
+        .padding(18)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var workSection: some View {

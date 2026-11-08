@@ -106,6 +106,25 @@ final class StudentProfileStore: ObservableObject {
         persist()
     }
 
+    func isAssignmentComplete(_ assignment: Assignment, studentID: String) -> Bool {
+        activityEvents.contains {
+            $0.studentID == studentID && $0.assignmentID == assignment.id && $0.manuallyCompleted == true
+        }
+    }
+
+    func setAssignmentComplete(_ complete: Bool, for assignment: Assignment, studentID: String) {
+        guard assignment.studentID == nil || assignment.studentID == studentID else { return }
+        guard isAssignmentComplete(assignment, studentID: studentID) != complete else { return }
+        if complete {
+            activityEvents.append(StudentActivityEvent(studentID: studentID, completedAssignment: assignment))
+        } else {
+            activityEvents.removeAll {
+                $0.studentID == studentID && $0.assignmentID == assignment.id && $0.manuallyCompleted == true
+            }
+        }
+        persist()
+    }
+
     func recordGrade(_ grade: AssignmentGrade, for assignment: Assignment, studentID: String) {
         activityEvents.append(StudentActivityEvent(studentID: studentID, assignment: assignment, grade: grade))
         updateSubjectPlanResults(grade, for: assignment, studentID: studentID)
