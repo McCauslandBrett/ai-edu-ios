@@ -31,36 +31,54 @@ struct AssignmentWorksheetView: View {
         .frame(maxWidth: .infinity, minHeight: CGFloat(pageCount) * standardPageHeight, alignment: .topLeading)
         .background(Color(uiColor: .systemBackground))
         .overlay {
-            PencilCanvas(drawing: $drawing)
-                .background(Color.clear)
-                .padding(.top, 12)
+            ZStack(alignment: .topLeading) {
+                PencilCanvas(drawing: $drawing)
+                    .background(Color.clear)
+                    .padding(.top, 12)
+                questionReadAloudLayer
+            }
         }
+    }
+
+    private var questionReadAloudLayer: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            pageHeading(1).hidden()
+            ForEach(Array(assignment.questions.enumerated()), id: \.offset) { index, question in
+                if index > 0 && index.isMultiple(of: exercisesPerPage) {
+                    Rectangle().fill(Color.clear).frame(height: 2).padding(.vertical, 18)
+                    pageHeading(index / exercisesPerPage + 1).hidden()
+                }
+                HStack {
+                    Spacer()
+                    AssignmentReadAloudButton(
+                        text: question,
+                        id: "question-\(index)",
+                        speech: speech,
+                        shortLabel: true
+                    )
+                }
+                .frame(height: exerciseHeight(at: index), alignment: .topTrailing)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: CGFloat(pageCount) * standardPageHeight, alignment: .topLeading)
     }
 
     private func exercise(_ question: String, at index: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 Text("Exercise \(index + 1)").font(.caption.weight(.bold)).foregroundStyle(.indigo)
-                Spacer()
-                if let skills = assignment.questionSkills, skills.indices.contains(index) {
-                    Text(skills[index]).font(.caption).foregroundStyle(.secondary)
-                }
+                Spacer(minLength: 0)
+            }
+            if let skills = assignment.questionSkills, skills.indices.contains(index) {
+                Text(skills[index]).font(.caption).foregroundStyle(.secondary)
             }
             if let visuals = assignment.questionIllustrations,
                visuals.indices.contains(index), !visuals[index].isEmpty {
                 Text(visuals[index]).font(.system(size: 34)).accessibilityLabel("Exercise illustration")
             }
-            HStack(alignment: .top, spacing: 12) {
-                Text(question).font(.body.weight(.medium)).foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                AssignmentReadAloudButton(
-                    text: question,
-                    id: "question-\(index)",
-                    speech: speech,
-                    shortLabel: true
-                )
-            }
+            Text(question).font(.body.weight(.medium)).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
             Rectangle().fill(Color.indigo.opacity(0.16)).frame(height: 1)
             Spacer(minLength: 0)
         }
@@ -108,6 +126,7 @@ struct AssignmentReadAloudButton: View {
             .font(.caption.weight(.semibold))
             .padding(.horizontal, shortLabel ? 10 : 12)
             .padding(.vertical, 8)
+            .frame(minWidth: 44, minHeight: 44)
             .background(Color.indigo.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)

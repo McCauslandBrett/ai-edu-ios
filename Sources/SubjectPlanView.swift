@@ -11,6 +11,14 @@ struct SubjectPlanView: View {
     var body: some View {
         List {
             SubjectPlanOverviewSection(student: student, subject: subject, saved: saved, fallback: fallback)
+            if let id = saved?.prebuiltSubjectID,
+               let curriculum = MEPSubject.catalog.first(where: { $0.id == id }) {
+                Section("MEP curriculum") {
+                    NavigationLink("Open workbooks and teaching materials") {
+                        MEPResourceView(subject: curriculum, onAdd: nil)
+                    }
+                }
+            }
             if let saved {
                 TrackedSkillsSection(progress: saved.plan.progress)
                 ForEach(saved.plan.weeks) { week in
@@ -206,5 +214,49 @@ private struct SubjectAssignmentsSection: View {
                 }
             }
         }
+    }
+}
+
+struct MEPResourceView: View {
+    let subject: MEPSubject
+    let onAdd: (() -> Void)?
+
+    private var categories: [String] {
+        var result: [String] = []
+        for resource in subject.resources where !result.contains(resource.category) {
+            result.append(resource.category)
+        }
+        return result
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Text("Mathematics Enhancement Programme · CIMT").font(.headline)
+                Text("Start with Learning Objectives and the shared guidelines. Follow the lesson plans alongside the practice books at your child's pace.")
+                if let onAdd {
+                    Button("Add \(subject.name)", action: onAdd)
+                        .font(.headline)
+                }
+            }
+            ForEach(categories, id: \.self) { category in
+                Section(category) {
+                    ForEach(subject.resources.filter { $0.category == category }) { resource in
+                        if let url = URL(string: resource.url) {
+                            Link(destination: url) {
+                                Label(resource.title, systemImage: "doc.text")
+                            }
+                        }
+                    }
+                }
+            }
+            Section {
+                Link("Original MEP curriculum", destination: URL(string: "https://www.cimt.org.uk/projects/mepres/primary/index.htm")!)
+                Text("Copyright belongs to the original creators. CIMT provides these materials for downloading and dissemination for non-profit making purposes only. Resources open from CIMT and require internet access.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle(subject.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

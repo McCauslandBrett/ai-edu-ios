@@ -33,6 +33,7 @@ struct SubjectPlanCreationView: View {
             Form {
                 generationStatusSection
                 errorSection
+                prebuiltSubjectsSection
                 studentContextSection
                 subjectGoalsSection
                 assessmentHistorySection
@@ -72,6 +73,29 @@ struct SubjectPlanCreationView: View {
                     .disabled(isGenerating)
             }
         }
+    }
+
+    private var prebuiltSubjectsSection: some View {
+        Section {
+            ForEach(MEPSubject.catalog) { item in
+                NavigationLink {
+                    MEPResourceView(subject: item) {
+                        onCreate(item.makePlan(studentID: student.id))
+                        onClose()
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.name).font(.headline)
+                        Text("MEP · \(item.resources.count) resources").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Choose a prebuilt subject")
+        } footer: {
+            Text("Ready-to-use MEP curriculum with workbooks, objectives, lesson plans, and teaching materials. Or create a custom subject below.")
+        }
+        .disabled(isGenerating)
     }
 
     private var studentContextSection: some View {

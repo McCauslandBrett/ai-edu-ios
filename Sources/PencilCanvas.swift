@@ -25,7 +25,7 @@ struct PencilCanvas: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> PKCanvasView {
-        let canvas = PKCanvasView()
+        let canvas: PKCanvasView = drawingPolicy == .pencilOnly ? PencilOnlyCanvasView() : PKCanvasView()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
         canvas.drawingPolicy = drawingPolicy
@@ -91,6 +91,17 @@ struct PencilCanvas: UIViewRepresentable {
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             parent.drawing = canvasView.drawing
         }
+    }
+}
+
+/// Lets finger taps reach worksheet controls layered below the full-page canvas.
+/// Apple Pencil events still hit the canvas for drawing.
+@MainActor
+private final class PencilOnlyCanvasView: PKCanvasView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let includesPencilTouch = event?.allTouches?.contains { $0.type == .pencil } == true
+        guard includesPencilTouch else { return nil }
+        return super.hitTest(point, with: event)
     }
 }
 
