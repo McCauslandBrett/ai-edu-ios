@@ -16,7 +16,6 @@ final class AssignmentWorkspaceModel: ObservableObject {
     private let generator: any AssignmentGenerationProviding
     private let adjuster: any AssignmentAdjusting
     private let gradeStore: any AssignmentGradePersisting
-    private let maximumSkillCount = 12
 
     init(assignment: Assignment, dependencies: AssignmentWorkspaceDependencies = .live) {
         self.assignment = assignment
@@ -49,27 +48,10 @@ final class AssignmentWorkspaceModel: ObservableObject {
 
     func applyChange(_ request: String, student: StudentProfile, profiles: StudentProfileStore) async throws {
         let adjusted = try await adjuster.adjust(assignment, for: student, request: request)
-        let updated = Assignment(
-            id: assignment.id,
-            subject: adjusted.subject,
-            title: adjusted.title,
-            dueDate: adjusted.dueDate,
-            points: adjusted.points,
-            prompt: adjusted.prompt,
-            questions: adjusted.questions,
-            answerKey: adjusted.answerKey,
-            rubric: adjusted.rubric,
-            status: adjusted.status,
-            questionSkills: adjusted.questionSkills,
-            studentID: student.id,
-            parentAssignmentID: assignment.parentAssignmentID,
-            questionIllustrations: adjusted.questionIllustrations,
-            writingSpaceMultipliers: adjusted.writingSpaceMultipliers,
-            resourceURL: assignment.resourceURL,
-            resourceTitle: assignment.resourceTitle,
-            resourcePageNumber: assignment.resourcePageNumber,
-            printedPageNumber: assignment.printedPageNumber,
-            answerKeyResourceURL: assignment.answerKeyResourceURL
+        let updated = AssignmentAdjustmentMerger.merge(
+            original: assignment,
+            adjusted: adjusted,
+            studentID: student.id
         )
         assignment = updated
         grade = nil
@@ -84,7 +66,9 @@ final class AssignmentWorkspaceModel: ObservableObject {
         retryError = nil
         defer { isGeneratingRetry = false }
         do {
-            guard let generated = try await generator.generate(retryRequest(grade, student: student)).first else {
+            guard let generated = try await generator.generate(AssignmentRetryRequestBuilder.build(
+                assignment: assignment, grade: grade, student: student
+            )).first else {
                 throw LearningAIServiceError.service("The service did not return a new assignment attempt.")
             }
             let attempt = generated.makeAssignment(
@@ -100,30 +84,5 @@ final class AssignmentWorkspaceModel: ObservableObject {
         }
     }
 
-    private func retryRequest(_ grade: AssignmentGrade, student: StudentProfile) -> AssignmentGenerationRequest {
-        let skills = failedSkills(in: grade)
-        let feedback = grade.items
-            .filter { !$0.isCorrect }
-            .map { "Question: \($0.question). Feedback: \($0.feedback)" }
-            .joined(separator: "\n")
-        return AssignmentGenerationRequest(
-            student: AIStudentContext(name: student.name, age: student.age, gradeLevel: student.gradeLevel),
-            subject: assignment.subject,
-            topic: assignment.title,
-            objective: "Create a fresh new attempt. Focus on these skills: \(skills.joined(separator: ", ")). Use different questions from the original. Original assignment guidance: \(assignment.prompt). Grading feedback to address: \(feedback)",
-            count: 1,
-            pointsPerAssignment: assignment.points,
-            targetedSkills: skills
-        )
-    }
 
-    private func failedSkills(in grade: AssignmentGrade) -> [String] {
-        let mappedSkills = assignment.questionSkills ?? []
-        let failed = grade.items.enumerated().compactMap { index, item -> String? in
-            guard !item.isCorrect, mappedSkills.indices.contains(index) else { return nil }
-            return mappedSkills[index]
-        }
-        let unique = Array(NSOrderedSet(array: failed)) as? [String] ?? failed
-        return unique.isEmpty ? [assignment.subject] : Array(unique.prefix(maximumSkillCount))
-    }
 }

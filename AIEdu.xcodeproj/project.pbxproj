@@ -50,6 +50,12 @@
 		100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000089 /* AssignmentReadAloudController.swift */; };
 		100000000000000000000090 /* MEPCurriculumPlanBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */; };
 		100000000000000000000092 /* MEPPracticeBookPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000093 /* MEPPracticeBookPageView.swift */; };
+		100000000000000000000094 /* MEPSubjectCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000095 /* MEPSubjectCatalog.swift */; };
+		100000000000000000000096 /* MEPVideoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000097 /* MEPVideoCatalog.swift */; };
+		100000000000000000000098 /* StudentSubjectPlanMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000099 /* StudentSubjectPlanMigrator.swift */; };
+		10000000000000000000009A /* AssignmentRetryRequestBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000009B /* AssignmentRetryRequestBuilder.swift */; };
+		10000000000000000000009C /* StudentAssignmentStateCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000009D /* StudentAssignmentStateCleaner.swift */; };
+		10000000000000000000009E /* AssignmentAdjustmentMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000009F /* AssignmentAdjustmentMerger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -97,6 +103,12 @@
 		100000000000000000000089 /* AssignmentReadAloudController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentReadAloudController.swift; sourceTree = "<group>"; };
 		100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPCurriculumPlanBuilder.swift; sourceTree = "<group>"; };
 		100000000000000000000093 /* MEPPracticeBookPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPPracticeBookPageView.swift; sourceTree = "<group>"; };
+		100000000000000000000095 /* MEPSubjectCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPSubjectCatalog.swift; sourceTree = "<group>"; };
+		100000000000000000000097 /* MEPVideoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MEPVideoCatalog.swift; sourceTree = "<group>"; };
+		100000000000000000000099 /* StudentSubjectPlanMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentSubjectPlanMigrator.swift; sourceTree = "<group>"; };
+		10000000000000000000009B /* AssignmentRetryRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentRetryRequestBuilder.swift; sourceTree = "<group>"; };
+		10000000000000000000009D /* StudentAssignmentStateCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudentAssignmentStateCleaner.swift; sourceTree = "<group>"; };
+		10000000000000000000009F /* AssignmentAdjustmentMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentAdjustmentMerger.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,6 +183,12 @@
 				100000000000000000000089 /* AssignmentReadAloudController.swift */,
 				100000000000000000000091 /* MEPCurriculumPlanBuilder.swift */,
 				100000000000000000000093 /* MEPPracticeBookPageView.swift */,
+				100000000000000000000095 /* MEPSubjectCatalog.swift */,
+				100000000000000000000097 /* MEPVideoCatalog.swift */,
+				100000000000000000000099 /* StudentSubjectPlanMigrator.swift */,
+				10000000000000000000009B /* AssignmentRetryRequestBuilder.swift */,
+				10000000000000000000009D /* StudentAssignmentStateCleaner.swift */,
+				10000000000000000000009F /* AssignmentAdjustmentMerger.swift */,
 				100000000000000000000075 /* Assets.xcassets */,
 			);
 			path = Sources;
@@ -281,6 +299,12 @@
 				100000000000000000000088 /* AssignmentReadAloudController.swift in Sources */,
 				100000000000000000000090 /* MEPCurriculumPlanBuilder.swift in Sources */,
 				100000000000000000000092 /* MEPPracticeBookPageView.swift in Sources */,
+				100000000000000000000094 /* MEPSubjectCatalog.swift in Sources */,
+				100000000000000000000096 /* MEPVideoCatalog.swift in Sources */,
+				100000000000000000000098 /* StudentSubjectPlanMigrator.swift in Sources */,
+				10000000000000000000009A /* AssignmentRetryRequestBuilder.swift in Sources */,
+				10000000000000000000009C /* StudentAssignmentStateCleaner.swift in Sources */,
+				10000000000000000000009E /* AssignmentAdjustmentMerger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

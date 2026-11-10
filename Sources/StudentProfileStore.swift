@@ -14,12 +14,21 @@ final class StudentProfileStore: ObservableObject {
 
     private let persistence: any StudentProfilePersisting
     private let assignmentCatalog = StudentAssignmentCatalog()
+    private let assignmentStateCleaner = StudentAssignmentStateCleaner()
+    private let curriculumPlanBuilder: any MEPCurriculumPlanBuilding
 
-    init(persistence: any StudentProfilePersisting = StudentProfilePersistence()) {
+    init(
+        persistence: any StudentProfilePersisting = StudentProfilePersistence(),
+        curriculumPlanBuilder: any MEPCurriculumPlanBuilding = MEPCurriculumPlanBuilder()
+    ) {
         self.persistence = persistence
+        self.curriculumPlanBuilder = curriculumPlanBuilder
         var initialStudents = persistence.loadStudents()
         let loadedSubjectPlans = persistence.loadSubjectPlans()
-        let migration = Self.migratePrebuiltPlans(loadedSubjectPlans)
+        let migration = StudentSubjectPlanMigrator.migrate(
+            loadedSubjectPlans,
+            planBuilder: curriculumPlanBuilder
+        )
         for studentIndex in initialStudents.indices {
             let studentID = initialStudents[studentIndex].id
             guard let renamedSubjects = migration.subjectRenames[studentID] else { continue }
@@ -79,9 +88,14 @@ final class StudentProfileStore: ObservableObject {
         let hasActiveLegacyCopy = subjectPlans.values.contains {
             $0.studentID == studentID && $0.prebuiltSubjectID == curriculum.id && $0.planInstanceID == nil
         }
-        let legacyPlan = hasActiveLegacyCopy ? nil : curriculum.makePlan(studentID: studentID)
+        let legacyPlan = hasActiveLegacyCopy ? nil : curriculumPlanBuilder.build(
+            subject: curriculum,
+            studentID: studentID,
+            subjectName: nil,
+            planInstanceID: nil
+        )
         let staleLegacyAssignments = legacyPlan.map {
-            assignmentsToClean(for: $0)
+            assignmentStateCleaner.assignmentsToClean(for: $0, retries: retryAssignments)
         } ?? []
         if let legacyPlan {
             removeAssignmentState(for: legacyPlan)
@@ -95,7 +109,8 @@ final class StudentProfileStore: ObservableObject {
         )
         let subjectName = uniqueSubjectName(for: curriculum.name, usedNames: usedNames)
         let instanceID = UUID().uuidString.lowercased()
-        saveSubjectPlan(curriculum.makePlan(
+        saveSubjectPlan(curriculumPlanBuilder.build(
+            subject: curriculum,
             studentID: studentID,
             subjectName: subjectName,
             planInstanceID: instanceID
@@ -248,54 +263,15 @@ final class StudentProfileStore: ObservableObject {
     }
 
     private func removeAssignmentState(for plan: StudentSubjectPlan) {
-        let assignmentIDs = Set(assignmentsIncludingLegacyIDs(for: plan).map(\.id))
-        guard !assignmentIDs.isEmpty else { return }
-        let subjectNames = historicalSubjectNames(for: plan)
-        retryAssignments.removeAll { assignment in
-            guard assignment.studentID == plan.studentID else { return false }
-            return assignmentIDs.contains(assignment.id)
-                || assignment.parentAssignmentID.map(assignmentIDs.contains) == true
-                || subjectNames.contains(normalizedSubjectName(assignment.subject))
-        }
-        activityEvents.removeAll { event in
-            guard event.studentID == plan.studentID else { return false }
-            return event.assignmentID.map(assignmentIDs.contains) == true
-                || subjectNames.contains(normalizedSubjectName(event.subject))
-        }
-        assignmentOverrides = assignmentOverrides.filter { _, assignment in
-            assignment.studentID != plan.studentID || !assignmentIDs.contains(assignment.id)
-        }
-    }
-
-    private func assignmentsIncludingLegacyIDs(for plan: StudentSubjectPlan) -> [Assignment] {
-        assignmentCatalog.assignments(from: plan).flatMap { assignment in
-            let legacyID = assignment.id.replacingOccurrences(of: "-mep-v3-y", with: "-mep-y")
-            guard legacyID != assignment.id else { return [assignment] }
-            return [assignment, assignment.reidentified(as: legacyID)]
-        }
-    }
-
-    private func assignmentsToClean(for plan: StudentSubjectPlan) -> [Assignment] {
-        var assignments = assignmentsIncludingLegacyIDs(for: plan)
-        let planIDs = Set(assignments.map(\.id))
-        assignments.append(contentsOf: retryAssignments.filter { assignment in
-            guard assignment.studentID == plan.studentID else { return false }
-            return planIDs.contains(assignment.id)
-                || assignment.parentAssignmentID.map(planIDs.contains) == true
-                || historicalSubjectNames(for: plan).contains(normalizedSubjectName(assignment.subject))
-        })
-        var addedIDs = Set<String>()
-        return assignments.filter { addedIDs.insert($0.id).inserted }
-    }
-
-    private func historicalSubjectNames(for plan: StudentSubjectPlan) -> Set<String> {
-        var names = [normalizedSubjectName(plan.subject)]
-        guard let prebuiltID = plan.prebuiltSubjectID else { return Set(names) }
-        let level = prebuiltID
-            .replacingOccurrences(of: "mep-year-", with: "")
-            .replacingOccurrences(of: "-math", with: "")
-        names.append(normalizedSubjectName("Year \(level) Math"))
-        return Set(names)
+        let currentState = StudentAssignmentState(
+            retryAssignments: retryAssignments,
+            activityEvents: activityEvents,
+            overrides: assignmentOverrides
+        )
+        let cleanedState = assignmentStateCleaner.removingState(for: plan, from: currentState)
+        retryAssignments = cleanedState.retryAssignments
+        activityEvents = cleanedState.activityEvents
+        assignmentOverrides = cleanedState.overrides
     }
 
     @discardableResult
@@ -364,53 +340,6 @@ final class StudentProfileStore: ObservableObject {
         )
     }
 
-    private static func migratePrebuiltPlans(
-        _ existingPlans: [String: StudentSubjectPlan]
-    ) -> (plans: [String: StudentSubjectPlan], subjectRenames: [String: [String: String]], didChange: Bool) {
-        var plans = existingPlans
-        var subjectRenames: [String: [String: String]] = [:]
-        var didChange = false
-
-        for (key, existing) in existingPlans {
-            guard (existing.prebuiltContentVersion ?? 0) < 4,
-                  let prebuiltID = existing.prebuiltSubjectID,
-                  let curriculum = MEPSubject.catalog.first(where: { $0.id == prebuiltID }) else {
-                continue
-            }
-
-            let generated = curriculum.makePlan(
-                studentID: existing.studentID,
-                subjectName: existing.subject,
-                planInstanceID: existing.planInstanceID
-            )
-            let plan = GeneratedLearningPlan(
-                subject: generated.plan.subject,
-                objective: generated.plan.objective,
-                monthlyWindow: generated.plan.monthlyWindow,
-                milestones: generated.plan.milestones,
-                progress: existing.plan.progress.isEmpty ? generated.plan.progress : existing.plan.progress,
-                weeks: generated.plan.weeks
-            )
-            let updated = StudentSubjectPlan(
-                studentID: existing.studentID,
-                subject: generated.subject,
-                inputs: existing.inputs,
-                plan: plan,
-                prebuiltSubjectID: existing.prebuiltSubjectID,
-                prebuiltContentVersion: 4,
-                planInstanceID: existing.planInstanceID,
-                competencyResults: existing.competencyResults
-            )
-            plans.removeValue(forKey: key)
-            plans[updated.id] = updated
-            if existing.subject.caseInsensitiveCompare(updated.subject) != .orderedSame {
-                subjectRenames[existing.studentID, default: [:]][existing.subject] = updated.subject
-            }
-            didChange = true
-        }
-
-        return (plans, subjectRenames, didChange)
-    }
 
 }
 

@@ -34,6 +34,7 @@ struct SubjectPlanView: View {
                     SubjectWeekSection(
                         student: student,
                         subject: subject,
+                        planStateID: saved.planInstanceID ?? saved.id,
                         week: week,
                         trackedSkills: saved.plan.progress.map(\.subject),
                         fullYearWeekCount: saved.plan.monthlyWindow.hasPrefix("Full-year") ? saved.plan.weeks.count : nil,
@@ -123,6 +124,7 @@ private struct SubjectWeekSection: View {
     @EnvironmentObject private var profiles: StudentProfileStore
     let student: StudentProfile
     let subject: String
+    let planStateID: String
     let week: GeneratedLearningPlan.Week
     let trackedSkills: [String]
     let fullYearWeekCount: Int?
@@ -159,7 +161,7 @@ private struct SubjectWeekSection: View {
                         Label("Weekly videos", systemImage: "play.rectangle.fill")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                         ForEach(weeklyVideos, id: \.url) { video in
-                            VisitedVideoLink(video: video, studentID: student.id)
+                            VisitedVideoLink(video: video, studentID: student.id, planStateID: planStateID)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -334,15 +336,18 @@ struct MEPResourceView: View {
     }
 }
 
-/// A successful link open marks the URL visited for this student, including in other weeks.
+/// A successful link open is tracked per plan copy and shared across that copy's weeks.
 private struct VisitedVideoLink: View {
     @Environment(\.openURL) private var openURL
     @AppStorage private var visited: Bool
     let video: GeneratedLearningPlan.SuggestedVideo
 
-    init(video: GeneratedLearningPlan.SuggestedVideo, studentID: String) {
+    init(video: GeneratedLearningPlan.SuggestedVideo, studentID: String, planStateID: String) {
         self.video = video
-        _visited = AppStorage(wrappedValue: false, "visited-video::\(studentID)::\(video.url)")
+        _visited = AppStorage(
+            wrappedValue: false,
+            "visited-video::\(studentID)::\(planStateID)::\(video.url)"
+        )
     }
 
     var body: some View {
