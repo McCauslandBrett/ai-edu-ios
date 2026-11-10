@@ -24,7 +24,14 @@ final class StudentProfileStore: ObservableObject {
         self.persistence = persistence
         self.prebuiltSubjectPlanBuilder = prebuiltSubjectPlanBuilder
         var initialStudents = persistence.loadStudents()
-        let loadedSubjectPlans = persistence.loadSubjectPlans()
+        let activeStudentIDs = Set(initialStudents.map(\.id))
+        let retiredPlaceholderIDs = Set(StudentProfile.legacyExamples.dropFirst().map(\.id))
+        let removedPlaceholderIDs = retiredPlaceholderIDs.subtracting(activeStudentIDs)
+
+        let storedSubjectPlans = persistence.loadSubjectPlans()
+        let loadedSubjectPlans = storedSubjectPlans.filter { _, plan in
+            !removedPlaceholderIDs.contains(plan.studentID)
+        }
         let migration = StudentSubjectPlanMigrator.migrate(
             loadedSubjectPlans,
             planBuilder: prebuiltSubjectPlanBuilder
@@ -38,12 +45,31 @@ final class StudentProfileStore: ObservableObject {
         }
         self.students = initialStudents
         self.subjectPlans = migration.plans
-        self.retryAssignments = persistence.loadRetryAssignments()
-        self.activityEvents = persistence.loadActivityEvents()
-        self.assignmentOverrides = persistence.loadAssignmentOverrides()
-        self.selectedStudentID = persistence.loadSelectedStudentID(fallback: initialStudents.first?.id ?? "student-1")
+        let storedRetries = persistence.loadRetryAssignments()
+        self.retryAssignments = storedRetries.filter { assignment in
+            guard let studentID = assignment.studentID else { return true }
+            return !removedPlaceholderIDs.contains(studentID)
+        }
+        let storedActivity = persistence.loadActivityEvents()
+        self.activityEvents = storedActivity.filter { !removedPlaceholderIDs.contains($0.studentID) }
+        let storedOverrides = persistence.loadAssignmentOverrides()
+        self.assignmentOverrides = storedOverrides.filter { _, assignment in
+            guard let studentID = assignment.studentID else { return true }
+            return !removedPlaceholderIDs.contains(studentID)
+        }
+        let storedSelectedStudentID = persistence.loadSelectedStudentID(
+            fallback: initialStudents.first?.id ?? "student-1"
+        )
+        let activeSelectedStudentID = activeStudentIDs.contains(storedSelectedStudentID)
+            ? storedSelectedStudentID
+            : (initialStudents.first?.id ?? "student-1")
+        self.selectedStudentID = activeSelectedStudentID
 
-        if migration.didChange {
+        let removedPlaceholderState = loadedSubjectPlans.count != storedSubjectPlans.count ||
+            retryAssignments.count != storedRetries.count ||
+            activityEvents.count != storedActivity.count ||
+            assignmentOverrides.count != storedOverrides.count
+        if migration.didChange || removedPlaceholderState {
             persistence.save(
                 students: initialStudents,
                 subjectPlans: migration.plans,
@@ -51,6 +77,9 @@ final class StudentProfileStore: ObservableObject {
                 activityEvents: activityEvents,
                 assignmentOverrides: assignmentOverrides
             )
+        }
+        if storedSelectedStudentID != activeSelectedStudentID {
+            persistence.saveSelectedStudentID(activeSelectedStudentID)
         }
     }
 

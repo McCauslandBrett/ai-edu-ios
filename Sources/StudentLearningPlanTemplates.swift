@@ -54,28 +54,6 @@ enum StudentLearningPlanTemplates {
 
     static func forStudent(_ id: String) -> StudentLearningPlan {
         switch id {
-        case "student-2":
-            return .init(subject: "Reading", focus: "Increase inference and evidence-based reading comprehension.", month: "November 2026", milestones: [
-                .init(id: "m5", title: "Reading baseline", date: "Nov 3", kind: "Assessment"),
-                .init(id: "m6", title: "Close reading task", date: "Nov 8", kind: "Assignment"),
-                .init(id: "m7", title: "Guided discussion", date: "Nov 12", kind: "Lesson"),
-                .init(id: "m8", title: "Reading check-in", date: "Nov 25", kind: "Review")
-            ], progress: [
-                .init(subject: "Inference", completion: 78, nextMilestone: "Support answers with text evidence", status: "On track"),
-                .init(subject: "Vocabulary", completion: 64, nextMilestone: "Use context clues", status: "Practice"),
-                .init(subject: "Summarization", completion: 81, nextMilestone: "Write concise summaries", status: "On track")
-            ])
-        case "student-3":
-            return .init(subject: "Algebra", focus: "Improve algebraic thinking with expressions, variables, and equations.", month: "November 2026", milestones: [
-                .init(id: "m9", title: "Algebra check", date: "Nov 1", kind: "Assessment"),
-                .init(id: "m10", title: "Solving equations", date: "Nov 6", kind: "Assignment"),
-                .init(id: "m11", title: "Coaching session", date: "Nov 13", kind: "Lesson"),
-                .init(id: "m12", title: "Final assessment", date: "Nov 24", kind: "Review")
-            ], progress: [
-                .init(subject: "Variables", completion: 83, nextMilestone: "Translate word problems", status: "On track"),
-                .init(subject: "Equations", completion: 58, nextMilestone: "Balance operations carefully", status: "Practice"),
-                .init(subject: "Patterns", completion: 45, nextMilestone: "Explain sequence rules", status: "Needs support")
-            ])
         default:
             return .init(subject: "Mathematics", focus: "Master fraction reasoning and measurement fluency.", month: "November 2026", milestones: [
                 .init(id: "m1", title: "Initial assessment", date: "Nov 2", kind: "Assessment"),

@@ -23,22 +23,38 @@ struct StudentProfilePersistence: StudentProfilePersisting {
         guard let decoded = decode([StudentProfile].self, for: Key.students), !decoded.isEmpty else {
             return StudentProfile.examples
         }
-        return migrateStarterProfiles(in: decoded)
+        let migrated = migrateStarterProfiles(in: decoded)
+        let renamedProfiles = migratingLegacyDefaultPlaceholder(in: migrated)
+        let activeProfiles = removingRetiredPlaceholderProfiles(from: renamedProfiles)
+        if activeProfiles != decoded {
+            saveEncoded(activeProfiles, for: Key.students)
+        }
+        return activeProfiles
     }
 
     private func migrateStarterProfiles(in profiles: [StudentProfile]) -> [StudentProfile] {
         var migrated = profiles
-        var didChange = false
         for index in migrated.indices where isUneditedStarterProfile(migrated[index]) {
             migrated[index].gradeLevel = "Not set"
             migrated[index].subjects = []
             migrated[index].summary = ""
-            didChange = true
-        }
-        if didChange {
-            saveEncoded(migrated, for: Key.students)
         }
         return migrated
+    }
+
+    private func migratingLegacyDefaultPlaceholder(in profiles: [StudentProfile]) -> [StudentProfile] {
+        guard let oldDefault = StudentProfile.legacyExamples.first,
+              let index = profiles.firstIndex(of: oldDefault) else {
+            return profiles
+        }
+        var migrated = profiles
+        migrated[index] = StudentProfile.defaultPlaceholder
+        return migrated
+    }
+
+    private func removingRetiredPlaceholderProfiles(from profiles: [StudentProfile]) -> [StudentProfile] {
+        let retiredPlaceholders = Set(StudentProfile.legacyExamples.dropFirst())
+        return profiles.filter { !retiredPlaceholders.contains($0) }
     }
 
     private func isUneditedStarterProfile(_ profile: StudentProfile) -> Bool {

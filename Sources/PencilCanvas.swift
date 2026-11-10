@@ -25,7 +25,7 @@ struct PencilCanvas: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> PKCanvasView {
-        let canvas: PKCanvasView = drawingPolicy == .pencilOnly ? PencilOnlyCanvasView() : PKCanvasView()
+        let canvas = PKCanvasView()
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
         canvas.drawingPolicy = drawingPolicy
@@ -41,6 +41,7 @@ struct PencilCanvas: UIViewRepresentable {
             context.coordinator.attachToolPicker(to: canvas, window: window)
         }
         DispatchQueue.main.async {
+            context.coordinator.preventParentScrollsFromHandlingPencil(canvas)
             if showsToolPicker, let window = canvas.window {
                 context.coordinator.attachToolPicker(to: canvas, window: window)
             }
@@ -53,9 +54,11 @@ struct PencilCanvas: UIViewRepresentable {
         if canvas.drawing != drawing {
             canvas.drawing = drawing
         }
+        canvas.drawingPolicy = drawingPolicy
         if let toolMode {
             canvas.tool = toolMode.pencilKitTool
         }
+        context.coordinator.preventParentScrollsFromHandlingPencil(canvas)
         if showsToolPicker, let window = canvas.window {
             context.coordinator.attachToolPicker(to: canvas, window: window)
         } else {
@@ -63,10 +66,21 @@ struct PencilCanvas: UIViewRepresentable {
         }
     }
 
+    static func dismantleUIView(_ canvas: PKCanvasView, coordinator: Coordinator) {
+        coordinator.restoreParentScrollTouchPolicies()
+        coordinator.detachToolPicker(from: canvas)
+    }
+
     @MainActor
     final class Coordinator: NSObject, PKCanvasViewDelegate {
         var parent: PencilCanvas
         private var toolPicker: PKToolPicker?
+        private var parentScrollTouchPolicies: [ScrollViewTouchPolicy] = []
+
+        private struct ScrollViewTouchPolicy {
+            weak var scrollView: UIScrollView?
+            let allowedTouchTypes: [NSNumber]?
+        }
 
         init(_ parent: PencilCanvas) {
             self.parent = parent
@@ -88,20 +102,40 @@ struct PencilCanvas: UIViewRepresentable {
             self.toolPicker = nil
         }
 
+        func preventParentScrollsFromHandlingPencil(_ canvas: PKCanvasView) {
+            var ancestor = canvas.superview
+            while let view = ancestor {
+                if let scrollView = view as? UIScrollView,
+                   !parentScrollTouchPolicies.contains(where: { $0.scrollView === scrollView }) {
+                    parentScrollTouchPolicies.append(ScrollViewTouchPolicy(
+                        scrollView: scrollView,
+                        allowedTouchTypes: scrollView.panGestureRecognizer.allowedTouchTypes
+                    ))
+                    scrollView.panGestureRecognizer.require(toFail: canvas.drawingGestureRecognizer)
+                    scrollView.panGestureRecognizer.allowedTouchTypes = [
+                        NSNumber(value: UITouch.TouchType.direct.rawValue)
+                    ]
+                }
+                ancestor = view.superview
+            }
+        }
+
+        func restoreParentScrollTouchPolicies() {
+            let defaultTouchTypes = [
+                UITouch.TouchType.direct,
+                .indirect,
+                .pencil,
+                .indirectPointer
+            ].map { NSNumber(value: $0.rawValue) }
+            for policy in parentScrollTouchPolicies {
+                policy.scrollView?.panGestureRecognizer.allowedTouchTypes = policy.allowedTouchTypes ?? defaultTouchTypes
+            }
+            parentScrollTouchPolicies.removeAll()
+        }
+
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             parent.drawing = canvasView.drawing
         }
-    }
-}
-
-/// Lets finger taps reach worksheet controls layered below the full-page canvas.
-/// Apple Pencil events still hit the canvas for drawing.
-@MainActor
-private final class PencilOnlyCanvasView: PKCanvasView {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        let includesPencilTouch = event?.allTouches?.contains { $0.type == .pencil } == true
-        guard includesPencilTouch else { return nil }
-        return super.hitTest(point, with: event)
     }
 }
 
