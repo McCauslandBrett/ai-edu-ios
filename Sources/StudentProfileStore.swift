@@ -15,19 +15,19 @@ final class StudentProfileStore: ObservableObject {
     private let persistence: any StudentProfilePersisting
     private let assignmentCatalog = StudentAssignmentCatalog()
     private let assignmentStateCleaner = StudentAssignmentStateCleaner()
-    private let curriculumPlanBuilder: any MEPCurriculumPlanBuilding
+    private let prebuiltSubjectPlanBuilder: any PrebuiltSubjectPlanBuilding
 
     init(
         persistence: any StudentProfilePersisting = StudentProfilePersistence(),
-        curriculumPlanBuilder: any MEPCurriculumPlanBuilding = MEPCurriculumPlanBuilder()
+        prebuiltSubjectPlanBuilder: any PrebuiltSubjectPlanBuilding = PrebuiltSubjectPlanBuilder()
     ) {
         self.persistence = persistence
-        self.curriculumPlanBuilder = curriculumPlanBuilder
+        self.prebuiltSubjectPlanBuilder = prebuiltSubjectPlanBuilder
         var initialStudents = persistence.loadStudents()
         let loadedSubjectPlans = persistence.loadSubjectPlans()
         let migration = StudentSubjectPlanMigrator.migrate(
             loadedSubjectPlans,
-            planBuilder: curriculumPlanBuilder
+            planBuilder: prebuiltSubjectPlanBuilder
         )
         for studentIndex in initialStudents.indices {
             let studentID = initialStudents[studentIndex].id
@@ -83,12 +83,12 @@ final class StudentProfileStore: ObservableObject {
     /// Adds a new prebuilt plan instance with its own subject name and activity identities.
     /// Selecting the same catalog item again therefore starts clean without changing earlier work.
     @discardableResult
-    func addPrebuiltSubject(_ curriculum: MEPSubject, studentID: String) -> [Assignment] {
+    func addPrebuiltSubject(_ curriculum: PrebuiltSubject, studentID: String) -> [Assignment] {
         guard students.contains(where: { $0.id == studentID }) else { return [] }
         let hasActiveLegacyCopy = subjectPlans.values.contains {
             $0.studentID == studentID && $0.prebuiltSubjectID == curriculum.id && $0.planInstanceID == nil
         }
-        let legacyPlan = hasActiveLegacyCopy ? nil : curriculumPlanBuilder.build(
+        let legacyPlan = hasActiveLegacyCopy ? nil : prebuiltSubjectPlanBuilder.build(
             subject: curriculum,
             studentID: studentID,
             subjectName: nil,
@@ -109,7 +109,7 @@ final class StudentProfileStore: ObservableObject {
         )
         let subjectName = uniqueSubjectName(for: curriculum.name, usedNames: usedNames)
         let instanceID = UUID().uuidString.lowercased()
-        saveSubjectPlan(curriculumPlanBuilder.build(
+        saveSubjectPlan(prebuiltSubjectPlanBuilder.build(
             subject: curriculum,
             studentID: studentID,
             subjectName: subjectName,

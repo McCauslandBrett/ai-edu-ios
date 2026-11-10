@@ -10,16 +10,16 @@ struct StudentSubjectPlanMigration {
 enum StudentSubjectPlanMigrator {
     static func migrate(
         _ existingPlans: [String: StudentSubjectPlan],
-        planBuilder: any MEPCurriculumPlanBuilding = MEPCurriculumPlanBuilder()
+        planBuilder: any PrebuiltSubjectPlanBuilding = PrebuiltSubjectPlanBuilder()
     ) -> StudentSubjectPlanMigration {
         var plans = existingPlans
         var subjectRenames: [String: [String: String]] = [:]
         var didChange = false
 
         for (key, existing) in existingPlans {
-            guard (existing.prebuiltContentVersion ?? 0) < 4,
-                  let prebuiltID = existing.prebuiltSubjectID,
-                  let curriculum = MEPSubject.catalog.first(where: { $0.id == prebuiltID }) else {
+            guard let prebuiltID = existing.prebuiltSubjectID,
+                  let curriculum = PrebuiltSubject.catalog.first(where: { $0.id == prebuiltID }),
+                  (existing.prebuiltContentVersion ?? 0) < curriculum.contentVersion else {
                 continue
             }
 
@@ -43,7 +43,7 @@ enum StudentSubjectPlanMigrator {
                 inputs: existing.inputs,
                 plan: plan,
                 prebuiltSubjectID: existing.prebuiltSubjectID,
-                prebuiltContentVersion: 4,
+                prebuiltContentVersion: curriculum.contentVersion,
                 planInstanceID: existing.planInstanceID,
                 competencyResults: existing.competencyResults
             )

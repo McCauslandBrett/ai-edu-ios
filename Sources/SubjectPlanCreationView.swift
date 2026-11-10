@@ -79,9 +79,9 @@ struct SubjectPlanCreationView: View {
 
     private var prebuiltSubjectsSection: some View {
         Section {
-            ForEach(MEPSubject.catalog) { item in
+            ForEach(PrebuiltSubject.catalog) { item in
                 NavigationLink {
-                    MEPResourceView(subject: item) {
+                    PrebuiltSubjectResourceView(subject: item) {
                         let staleAssignments = profiles.addPrebuiltSubject(item, studentID: student.id)
                         removeStoredWork(for: staleAssignments)
                         onClose()
@@ -89,14 +89,14 @@ struct SubjectPlanCreationView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.name).font(.headline)
-                        Text("MEP · \(item.resources.count) resources").font(.caption).foregroundStyle(.secondary)
+                        Text("\(item.publisher) · \(item.summary)").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
         } header: {
             Text("Choose a prebuilt subject")
         } footer: {
-            Text("Each selection adds a separate MEP plan copy with fresh progress. You can add the same level again any time to start over. Or create a custom subject below.")
+            Text("Each selection adds an independent plan copy with fresh progress. You can add the same prebuilt subject again any time to start over, or create a custom subject below.")
         }
         .disabled(isGenerating)
     }

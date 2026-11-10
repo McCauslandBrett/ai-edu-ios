@@ -1,13 +1,6 @@
 import Foundation
 
-protocol MEPCurriculumPlanBuilding {
-    func build(
-        subject: MEPSubject,
-        studentID: String,
-        subjectName: String?,
-        planInstanceID: String?
-    ) -> StudentSubjectPlan
-}
+protocol MEPCurriculumPlanBuilding: PrebuiltSubjectPlanBuilding {}
 
 /// Converts the MEP catalogue into a four-week plan whose worksheet activities open
 /// the original Practice Book pages. It does not invent substitute worksheet questions.
@@ -40,7 +33,7 @@ struct MEPCurriculumPlanBuilder: MEPCurriculumPlanBuilding {
         subjectName: String? = nil,
         planInstanceID: String? = nil
     ) -> StudentSubjectPlan {
-        let planSubject = MEPSubject(id: subject.id, name: subjectName ?? subject.name, resources: subject.resources)
+        let planSubject = subject.named(subjectName ?? subject.name)
         let year = yearNumber(in: planSubject)
         let lessonCount = year == 6 ? 175 : 140
         let weekCount = weeksPerCourse
@@ -100,7 +93,7 @@ struct MEPCurriculumPlanBuilder: MEPCurriculumPlanBuilding {
             ),
             plan: plan,
             prebuiltSubjectID: planSubject.id,
-            prebuiltContentVersion: 4,
+            prebuiltContentVersion: subject.contentVersion,
             planInstanceID: planInstanceID
         )
     }
@@ -181,7 +174,11 @@ struct MEPCurriculumPlanBuilder: MEPCurriculumPlanBuilding {
         planInstanceID: String?
     ) -> GeneratedLearningPlan.PlannedActivity {
         let label = assessment ? "Weekly Practice Book check" : "Practice Book page \(pageNumber)"
-        let localPage = resource.flatMap { numberRange(in: $0.title)?.lowerBound }.map { pageNumber - $0 + 1 }
+        let localPage = resource.flatMap { selectedResource in
+            numberRange(in: selectedResource.title).map {
+                selectedResource.pdfStartPage + pageNumber - $0.lowerBound
+            }
+        }
         let answerKey = resource.flatMap { workbook in
             subjectResourceAnswerKey(for: workbook, in: MEPSubject.catalog.first { $0.id == "mep-year-\(year)-math" })
         }

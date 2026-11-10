@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		200000000000000000000001 /* PrebuiltSubjectPlanBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* PrebuiltSubjectPlanBuilder.swift */; };
 		100000000000000000000030 /* AIEduApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000040 /* AIEduApp.swift */; };
 		100000000000000000000031 /* Assignment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000041 /* Assignment.swift */; };
 		100000000000000000000032 /* AssignmentDocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000042 /* AssignmentDocumentStore.swift */; };
@@ -59,6 +60,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		200000000000000000000002 /* PrebuiltSubjectPlanBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrebuiltSubjectPlanBuilder.swift; sourceTree = "<group>"; };
 		100000000000000000000008 /* AIEdu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIEdu.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000040 /* AIEduApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIEduApp.swift; sourceTree = "<group>"; };
 		100000000000000000000041 /* Assignment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Assignment.swift; sourceTree = "<group>"; };
@@ -189,6 +191,7 @@
 				10000000000000000000009B /* AssignmentRetryRequestBuilder.swift */,
 				10000000000000000000009D /* StudentAssignmentStateCleaner.swift */,
 				10000000000000000000009F /* AssignmentAdjustmentMerger.swift */,
+				200000000000000000000002 /* PrebuiltSubjectPlanBuilder.swift */,
 				100000000000000000000075 /* Assets.xcassets */,
 			);
 			path = Sources;
@@ -305,6 +308,7 @@
 				10000000000000000000009A /* AssignmentRetryRequestBuilder.swift in Sources */,
 				10000000000000000000009C /* StudentAssignmentStateCleaner.swift in Sources */,
 				10000000000000000000009E /* AssignmentAdjustmentMerger.swift in Sources */,
+				200000000000000000000001 /* PrebuiltSubjectPlanBuilder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

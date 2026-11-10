@@ -274,3 +274,28 @@ enum MEPSubjectCatalog {
         ]),
     ]
 }
+
+/// Catalogs non-MEP prebuilt courses alongside the existing MEP collection.
+enum PrebuiltSubjectCatalog {
+    private static let firstGradePrep = PrebuiltSubject(
+        id: "first-grade-prep",
+        name: "First Grade Prep",
+        resources: [
+            PrebuiltSubject.Resource(
+                title: "Practice Book pages 25–72",
+                url: "https://www.mathlearningcenter.org/sites/default/files/pdfs/B1PB-B_0110w.pdf",
+                category: "Practice Book",
+                pdfStartPage: 51
+            )
+        ],
+        publisher: "The Math Learning Center",
+        summary: "4 weeks · Practice Book pages 25–72",
+        resourceIntroduction: "A four-week first-grade math plan built from the original Bridges Grade 1 Practice Book. Each week links to four source pages and a weekly check; students can write directly on the PDF pages in the app.",
+        sourceTitle: "Bridges Grade 1 Practice Book",
+        sourceURL: "https://www.mathlearningcenter.org/sites/default/files/pdfs/B1PB-B_0110w.pdf",
+        sourceNote: "Original Practice Book from The Math Learning Center. The source PDF opens online; an internet connection is needed to load a page the first time.",
+        contentVersion: 1
+    )
+
+    static let subjects: [PrebuiltSubject] = [firstGradePrep] + MEPSubjectCatalog.subjects
+}

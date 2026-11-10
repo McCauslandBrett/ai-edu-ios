@@ -19,7 +19,7 @@ struct MEPPracticeBookPageView: View {
                 Image(uiImage: pageImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .accessibilityLabel("Original MEP Practice Book page \(printedPageNumber ?? pageNumber)")
+                    .accessibilityLabel("Original Practice Book page \(printedPageNumber ?? pageNumber)")
             } else if loading {
                 ProgressView("Loading original Practice Book page…")
                     .frame(maxWidth: .infinity, minHeight: 500)
@@ -57,7 +57,7 @@ struct MEPPracticeBookPageView: View {
             pageImage = page.thumbnail(of: CGSize(width: 1600, height: 2263), for: .mediaBox)
             onTextLoaded(page.string ?? "")
         } catch {
-            loadError = "Could not load the official CIMT PDF. Check the connection and retry."
+            loadError = "Could not load the original Practice Book PDF. Check the connection and retry."
         }
     }
 
