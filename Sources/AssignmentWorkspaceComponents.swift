@@ -5,7 +5,6 @@ import PencilKit
 struct AssignmentWorksheetView: View {
     let assignment: Assignment
     @Binding var drawing: PKDrawing
-    @Binding var writingMode: Bool
     @ObservedObject var speech: AssignmentReadAloudController
     @Binding var sourcePageText: String
 
@@ -53,10 +52,7 @@ struct AssignmentWorksheetView: View {
         .background(Color(uiColor: .systemBackground))
         .overlay {
             ZStack(alignment: .topLeading) {
-                PencilCanvas(
-                    drawing: $drawing,
-                    drawingPolicy: writingMode ? .anyInput : .pencilOnly
-                )
+                PencilCanvas(drawing: $drawing)
                     .background(Color.clear)
                     .padding(.top, 12)
                 questionReadAloudLayer
@@ -77,10 +73,7 @@ struct AssignmentWorksheetView: View {
                     onTextLoaded: { sourcePageText = $0 }
                 )
                 .frame(width: pageWidth, height: pageHeight)
-                PencilCanvas(
-                    drawing: $drawing,
-                    drawingPolicy: writingMode ? .anyInput : .pencilOnly
-                )
+                PencilCanvas(drawing: $drawing)
                     .frame(width: pageWidth, height: pageHeight)
             }
             .frame(width: pageWidth, height: pageHeight)

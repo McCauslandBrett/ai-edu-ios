@@ -9,7 +9,6 @@ struct AssignmentWorkspaceView: View {
     @StateObject private var model: AssignmentWorkspaceModel
     @StateObject private var speech = AssignmentReadAloudController()
     @State private var drawing = PKDrawing()
-    @State private var writingMode = false
     @State private var sourcePageText = ""
     @State private var showingChangeRequest = false
 
@@ -58,7 +57,6 @@ struct AssignmentWorkspaceView: View {
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
         }
-        .scrollDisabled(writingMode)
         .background(Color(uiColor: .systemGroupedBackground))
         .sheet(isPresented: $showingChangeRequest) {
             AssignmentChangeRequestView { request in
@@ -67,18 +65,6 @@ struct AssignmentWorkspaceView: View {
         }
         .navigationTitle(model.assignment.title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    writingMode.toggle()
-                } label: {
-                    Label(writingMode ? "Done" : "Write", systemImage: writingMode ? "checkmark" : "pencil.tip.crop.circle")
-                }
-                .accessibilityHint(writingMode
-                    ? "Turn off writing mode to scroll the assignment"
-                    : "Enable writing mode for a finger or non-Apple stylus")
-            }
-        }
         .onAppear { restoreWorkspace() }
         .onDisappear { speech.stop() }
         .onChange(of: drawing) { _, newDrawing in
@@ -125,22 +111,10 @@ struct AssignmentWorkspaceView: View {
             HStack {
                 Label("Your work", systemImage: "pencil.tip.crop.circle").font(.headline)
                 Spacer()
-                Text(documents.status(for: model.assignment.id)).font(.caption).foregroundStyle(.secondary)
-                Button {
-                    writingMode.toggle()
-                } label: {
-                    Label(writingMode ? "Done" : "Write", systemImage: writingMode ? "checkmark" : "pencil.tip.crop.circle")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            if writingMode {
-                Label("Writing mode is on. Use your Apple Pencil, stylus, or finger; turn it off to scroll.", systemImage: "hand.draw")
-                    .font(.footnote).foregroundStyle(.secondary)
             }
             AssignmentWorksheetView(
                 assignment: model.assignment,
                 drawing: $drawing,
-                writingMode: $writingMode,
                 speech: speech,
                 sourcePageText: $sourcePageText
             )
